@@ -13,8 +13,8 @@ contract MANAToken {
 * @title Interface for contracts conforming to ERC-721
 */
 contract LANDRegistry {
-    function ownerOfLand(int x, int y) external view returns (address);
-    function assignMultipleParcels(int[] x, int[] y, address beneficiary) external;
+    function ownerOfLand(uint256 x, uint256 y) external view returns (address);
+    function assignMultipleParcels(uint256[] x, uint256[] y, address beneficiary) external;
     function supportsInterface(bytes4) public view returns (bool);
 }
 
@@ -23,33 +23,53 @@ contract LANDAuctionStorage {
 
     Status public status;
 
-    uint256 internal startPrice;
+    uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startTimestamp;
+    uint256 internal startedTime;
     uint256 internal duration;
 
-    MANAToken internal manaToken;
-    LANDRegistry internal landRegistry;
+    uint256 public gasPriceLimit;
+    uint256 public landsLimit;
+    MANAToken public manaToken;
+    LANDRegistry public landRegistry;
 
-    event BidSuccessful(
-      address indexed beneficiary,
-      uint256 price,
-      uint256[] xs,
-      uint256[] ys
+    event AuctionCreated(
+      address indexed _caller,
+      uint256 _initialPrice,
+      uint256 _endPrice,
+      uint256 _duration
     );
 
     event AuctionStarted(
-      uint256 time,
-      uint256 price
+      address indexed _caller,
+      uint256 _time
+    );
+
+    event BidSuccessful(
+      address indexed _beneficiary,
+      uint256 _price,
+      uint256 _totalPrice,
+      uint256[] _xs,
+      uint256[] _ys
     );
 
     event AuctionEnd(
-      uint256 time,
-      uint256 price
+      address _caller,
+      uint256 _price
     );
 
     event MANABurned(
-      address caller,
-      uint256 total
+      address indexed _caller,
+      uint256 _total
+    );
+
+    event LandsLimitChanged(
+      uint256 _oldLandsLimit, 
+      uint256 _landsLimit
+    );
+
+    event GasPriceLimitChanged(
+      uint256 _oldGasPriceLimit,
+      uint256 _gasPriceLimit
     );
 }
