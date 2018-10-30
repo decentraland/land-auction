@@ -18,7 +18,7 @@ contract AssetRegistryTest is ERC721 {
         }
     }
 
-    function _encodeTokenId(uint256 x, uint256 y) internal pure returns (uint256 result) {
+    function _encodeTokenId(uint256 x, uint256 y) public pure returns (uint256 result) {
         return _unsafeEncodeTokenId(x, y);
     }
 

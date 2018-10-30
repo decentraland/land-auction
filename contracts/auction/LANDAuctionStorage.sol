@@ -22,16 +22,15 @@ contract LANDAuctionStorage {
     enum Status { created, started, finished }
 
     Status public status;
+    uint256 public gasPriceLimit;
+    uint256 public landsLimit;
+    MANAToken public manaToken;
+    LANDRegistry public landRegistry;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
     uint256 internal startedTime;
     uint256 internal duration;
-
-    uint256 public gasPriceLimit;
-    uint256 public landsLimit;
-    MANAToken public manaToken;
-    LANDRegistry public landRegistry;
 
     event AuctionCreated(
       address indexed _caller,

@@ -69,11 +69,14 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
     * slope = (endPrice - startedPrice) / (duration - startedTime)
     * As Solidity does not support negative number we use it as: y = b - ax
+    * It should return endPrice if _time < duration
     * @param _time - uint256 time passed before reach duration
     * @return uint256 price for the given time
     */
     function _getPrice(uint256 _time) internal view returns (uint256) {
-        require(_time <= duration, "Invalid time");
+        if (_time > duration) {
+            return endPrice;
+        }
         return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
     }
 
@@ -102,7 +105,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         require(_beneficiary != address(0), "The beneficiary could not be 0 address");
         require(_xs.length > 0, "You should bid to at least one LAND");
         require(_xs.length <= landsLimit, "LAND limit exceeded");
-        require(_xs.length > _ys.length, "You should bid valid LANDs");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
 
         uint256 amount = _xs.length;
         uint256 currentPrice = getCurrentPrice();
@@ -136,15 +139,26 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
             "Burn should be performed when the auction is finished"
         );
         uint256 balance = manaToken.balanceOf(address(this));
+        require(
+            balance > 0,
+            "No MANA to burn"
+        );
         manaToken.burn(balance);
 
         emit MANABurned(msg.sender, balance);
     }
 
     /**
-    * @dev Finish auction 
+    * @dev pause auction 
     */
     function pause() public onlyOwner whenNotPaused {
+        finishAuction();
+    }
+
+    /**
+    * @dev Finish auction 
+    */
+    function finishAuction() public onlyOwner whenNotPaused {
         status = Status.finished;
         super.pause();
 
