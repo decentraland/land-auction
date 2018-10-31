@@ -574,21 +574,23 @@ contract('LANDAuction', function([
         gasPrice: gasPriceLimit
       })
       let log = logs1.logs[0]
-      total += log.args._totalPrice.toNumber()
+      total = log.args._totalPrice.plus(total)
 
+      await increaseTime(duration.hours(5))
       const logs2 = await landAuction.bid([5], [5], anotherBidder, {
         ...fromAnotherBidder,
         gasPrice: gasPriceLimit
       })
       log = logs2.logs[0]
-      total += log.args._totalPrice.toNumber()
+      total = log.args._totalPrice.plus(total)
 
+      await increaseTime(duration.days(3))
       const log3 = await landAuction.bid([6], [6], bidder, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
       log = log3.logs[0]
-      total += log.args._totalPrice.toNumber()
+      total = log.args._totalPrice.plus(total)
 
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(total)
