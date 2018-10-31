@@ -133,7 +133,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     /**
     * @dev Burn the MANA earned by the auction
     */
-    function burnFunds() external onlyOwner {
+    function burnFunds() external {
         require(
             status == Status.finished,
             "Burn should be performed when the auction is finished"

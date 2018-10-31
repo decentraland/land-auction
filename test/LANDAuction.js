@@ -726,11 +726,6 @@ contract('LANDAuction', function([
       await assertRevert(landAuction.burnFunds(fromOwner))
     })
 
-    it('reverts when no-owner trying to burn funds', async function() {
-      await landAuction.finishAuction(fromOwner)
-      await assertRevert(landAuction.burnFunds(fromHacker))
-    })
-
     it('reverts when trying to burn before finished', async function() {
       await assertRevert(landAuction.burnFunds(fromOwner))
     })
