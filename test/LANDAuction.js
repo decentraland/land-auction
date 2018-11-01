@@ -10,6 +10,7 @@ require('chai')
 const LANDAuction = artifacts.require('LANDAuction')
 const ERC20Token = artifacts.require('ERC20Test')
 const AssetRegistryToken = artifacts.require('AssetRegistryTest')
+const KyberConverter = artifacts.require('KyberConverter.sol')
 
 const AUCTION_STATUS_OP_CODES = {
   created: 0,
@@ -103,6 +104,7 @@ contract('LANDAuction', function([
   let landAuction
   let manaToken
   let landRegistry
+  let kyberConverter
 
   const fromOwner = { from: owner }
   const fromBidder = { from: bidder }
@@ -145,6 +147,9 @@ contract('LANDAuction', function([
     manaToken = await ERC20Token.new(creationParams)
     landRegistry = await AssetRegistryToken.new(creationParams)
 
+    // Create KyberConverter
+    kyberConverter = await KyberConverter.new(zeroAddress)
+
     // Create a LANDAuction
     landAuction = await LANDAuction.new(
       initialPrice,
@@ -152,6 +157,7 @@ contract('LANDAuction', function([
       auctionDuration,
       manaToken.address,
       landRegistry.address,
+      kyberConverter.address,
       fromOwner
     )
 
@@ -182,6 +188,7 @@ contract('LANDAuction', function([
         auctionDuration,
         manaToken.address,
         landRegistry.address,
+        kyberConverter.address,
         fromOwner
       )
 
@@ -209,6 +216,7 @@ contract('LANDAuction', function([
           auctionDuration,
           manaToken.address,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -222,6 +230,7 @@ contract('LANDAuction', function([
           auctionDuration,
           manaToken.address,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -235,6 +244,7 @@ contract('LANDAuction', function([
           duration.days(1),
           manaToken.address,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -248,6 +258,7 @@ contract('LANDAuction', function([
           auctionDuration,
           zeroAddress,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -259,6 +270,7 @@ contract('LANDAuction', function([
           auctionDuration,
           0,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -270,6 +282,7 @@ contract('LANDAuction', function([
           auctionDuration,
           owner,
           landRegistry.address,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -283,6 +296,7 @@ contract('LANDAuction', function([
           auctionDuration,
           manaToken.address,
           zeroAddress,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -294,6 +308,7 @@ contract('LANDAuction', function([
           auctionDuration,
           manaToken.address,
           0,
+          kyberConverter.address,
           fromOwner
         )
       )
@@ -305,9 +320,24 @@ contract('LANDAuction', function([
           auctionDuration,
           manaToken.address,
           owner,
+          kyberConverter.address,
           fromOwner
         )
       )
+
+      it('revert if instanciate with incorrect values :: kyber not a contract address', async function() {
+        await assertRevert(
+          LANDAuction.new(
+            endPrice - 1,
+            endPrice,
+            auctionDuration,
+            manaToken.address,
+            landRegistry.address,
+            0,
+            fromOwner
+          )
+        )
+      })
     })
   })
 
@@ -320,6 +350,7 @@ contract('LANDAuction', function([
         auctionDuration,
         manaToken.address,
         landRegistry.address,
+        kyberConverter.address,
         fromOwner
       )
     })
@@ -334,11 +365,13 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(3)
 
       assertEvent(logs[0], 'LandsLimitPerBidChanged', {
+        _caller: owner,
         _oldLandsLimitPerBid: '0',
         _landsLimitPerBid: landsLimitPerBid.toString()
       })
 
       assertEvent(logs[1], 'GasPriceLimitChanged', {
+        _caller: owner,
         _oldGasPriceLimit: '0',
         _gasPriceLimit: gasPriceLimit.toString()
       })

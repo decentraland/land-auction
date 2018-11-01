@@ -1,5 +1,9 @@
 pragma solidity ^0.4.24;
 
+<<<<<<< HEAD
+=======
+import "../dex/ITokenConverter.sol";
+>>>>>>> feat: kyber dex
 
 /**
 * @title Interface for MANA token conforming to ERC-20
@@ -20,6 +24,7 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
+    bytes4 public constant ACEPTED_ERC20 = 0x34;
     enum Status { created, started, finished }
 
     Status public status;
@@ -32,6 +37,7 @@ contract LANDAuctionStorage {
     uint256 internal endPrice;
     uint256 internal startedTime;
     uint256 internal duration;
+    ITokenConverter internal dex;
 
     event AuctionCreated(
       address indexed _caller,
@@ -65,12 +71,20 @@ contract LANDAuctionStorage {
     );
 
     event LandsLimitPerBidChanged(
+      address indexed _caller,
       uint256 _oldLandsLimitPerBid, 
       uint256 _landsLimitPerBid
     );
 
     event GasPriceLimitChanged(
+      address indexed _caller,
       uint256 _oldGasPriceLimit,
       uint256 _gasPriceLimit
+    );
+
+    event DexChanged(
+      address indexed _caller,
+      address _oldDex,
+      address _dex
     );
 }

@@ -24,7 +24,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 _endPrice, 
         uint256 _duration, 
         address _manaToken, 
-        address _landRegistry
+        address _landRegistry,
+        address _dex
     ) public 
     {
         require(
@@ -39,10 +40,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = LANDRegistry(_landRegistry);
 
+        require(_dex.isContract(), "The dex address must be a deployed contract");
+        dex = ITokenConverter(_dex);
+
         require(_initialPrice > _endPrice, "The start price should be greater than end price");
         require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
 
-        
         duration = _duration;
         initialPrice = _initialPrice;
         endPrice = _endPrice;
@@ -87,6 +90,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
      /**
+    * @dev Make a bid for LANDs
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _token - ERC20 accepted
+    */
+    function bidWithToken(int[] _xs, int[] _ys, address _beneficiary, bytes4 _token) external whenNotPaused {
+        require(_token == ACEPTED_ERC20, "token not accepted");
+        require(address(dex).isContract(), "Dex not available");
+        // dex.trade()
+        _bid(_xs, _ys, _beneficiary);
+    }
+
+    /**
     * @dev Make a bid for LANDs
     * @param _xs - uint256[] x values for the LANDs to bid
     * @param _ys - uint256[] y values for the LANDs to bid
@@ -180,7 +197,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner {
         require(_landsLimitPerBid > 0, "The lands limit should be greater than 0");
-        emit LandsLimitPerBidChanged(landsLimitPerBid, _landsLimitPerBid);
+        emit LandsLimitPerBidChanged(msg.sender, landsLimitPerBid, _landsLimitPerBid);
         landsLimitPerBid = _landsLimitPerBid;
     }
 
@@ -190,8 +207,17 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function setGasPriceLimit(uint256 _gasPriceLimit) public onlyOwner {
         require(_gasPriceLimit > 0, "The gas price should be greater than 0");
-        emit GasPriceLimitChanged(gasPriceLimit, _gasPriceLimit);
+        emit GasPriceLimitChanged(msg.sender, gasPriceLimit, _gasPriceLimit);
         gasPriceLimit = _gasPriceLimit;
+    }
+
+    /**
+    * @dev Set dex to convert ERC20
+    * @param _dex - uint256 gas price limit for a single bid
+    */
+    function setDex(address _dex) public onlyOwner {
+        emit DexChanged(msg.sender, dex, _dex);
+        dex = ITokenConverter(_dex);
     }
 
      /**
