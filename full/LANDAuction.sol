@@ -391,9 +391,7 @@ contract MANAToken {
 * @title Interface for contracts conforming to ERC-721
 */
 contract LANDRegistry {
-    function ownerOfLand(uint256 x, uint256 y) external view returns (address);
-    function assignMultipleParcels(uint256[] x, uint256[] y, address beneficiary) external;
-    function supportsInterface(bytes4) public view returns (bool);
+    function assignNewParcel(int x, int y, address beneficiary) external;
 }
 
 contract LANDAuctionStorage {
@@ -401,7 +399,7 @@ contract LANDAuctionStorage {
 
     Status public status;
     uint256 public gasPriceLimit;
-    uint256 public landsLimit;
+    uint256 public landsLimitPerBid;
     MANAToken public manaToken;
     LANDRegistry public landRegistry;
 
@@ -426,8 +424,8 @@ contract LANDAuctionStorage {
       address indexed _beneficiary,
       uint256 _price,
       uint256 _totalPrice,
-      uint256[] _xs,
-      uint256[] _ys
+      int[] _xs,
+      int[] _ys
     );
 
     event AuctionEnd(
@@ -440,9 +438,9 @@ contract LANDAuctionStorage {
       uint256 _total
     );
 
-    event LandsLimitChanged(
-      uint256 _oldLandsLimit, 
-      uint256 _landsLimit
+    event LandsLimitPerBidChanged(
+      uint256 _oldLandsLimitPerBid, 
+      uint256 _landsLimitPerBid
     );
 
     event GasPriceLimitChanged(
@@ -494,13 +492,13 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
 
     /**
     * @dev Start the auction
-    * @param _landsLimit - uint256 LANDs limit for a single id
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
     * @param _gasPriceLimit - uint256 gas price limit for a single bid
     */
-    function startAuction(uint256 _landsLimit, uint256 _gasPriceLimit) external onlyOwner whenNotPaused {
+    function startAuction(uint256 _landsLimitPerBid, uint256 _gasPriceLimit) external onlyOwner whenNotPaused {
         require(status == Status.created, "The auction was started");
 
-        setLandsLimit(_landsLimit);
+        setLandsLimitPerBid(_landsLimitPerBid);
         setGasPriceLimit(_gasPriceLimit);
 
         startedTime = block.timestamp;
@@ -545,12 +543,12 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _ys - uint256[] y values for the LANDs to bid
     * @param _beneficiary - address beneficiary for the LANDs to bid
     */
-    function bid(uint256[] _xs, uint256[] _ys, address _beneficiary) external whenNotPaused {
+    function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
         require(status == Status.started, "The auction was not started");
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
         require(_beneficiary != address(0), "The beneficiary could not be 0 address");
         require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimit, "LAND limit exceeded");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
         require(_xs.length == _ys.length, "X values length should be equal to Y values length");
 
         uint256 amount = _xs.length;
@@ -565,7 +563,16 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
 
         // @nacho TODO: allow LANDAuction to assign LANDs
         // Assign LANDs to _beneficiary
-        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
+        for(uint i = 0; i < _xs.length; i++) {
+            int x = _xs[i];
+            int y = _ys[i];
+            require(
+                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+            landRegistry.assignNewParcel(x, y, _beneficiary);
+        }
+
 
         emit BidSuccessful(
             _beneficiary,
@@ -614,12 +621,12 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
 
     /**
     * @dev Set LANDs limit for the auction
-    * @param _landsLimit - uint256 LANDs limit for a single id
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
     */
-    function setLandsLimit(uint256 _landsLimit) public onlyOwner {
-        require(_landsLimit > 0, "The lands limit should be greater than 0");
-        emit LandsLimitChanged(landsLimit, _landsLimit);
-        landsLimit = _landsLimit;
+    function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner {
+        require(_landsLimitPerBid > 0, "The lands limit should be greater than 0");
+        emit LandsLimitPerBidChanged(landsLimitPerBid, _landsLimitPerBid);
+        landsLimitPerBid = _landsLimitPerBid;
     }
 
     /**

@@ -21,7 +21,7 @@ contract LANDAuctionStorage {
 
     Status public status;
     uint256 public gasPriceLimit;
-    uint256 public landsLimit;
+    uint256 public landsLimitPerBid;
     MANAToken public manaToken;
     LANDRegistry public landRegistry;
 
@@ -60,9 +60,9 @@ contract LANDAuctionStorage {
       uint256 _total
     );
 
-    event LandsLimitChanged(
-      uint256 _oldLandsLimit, 
-      uint256 _landsLimit
+    event LandsLimitPerBidChanged(
+      uint256 _oldLandsLimitPerBid, 
+      uint256 _landsLimitPerBid
     );
 
     event GasPriceLimitChanged(

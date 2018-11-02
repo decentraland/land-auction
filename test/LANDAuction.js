@@ -93,7 +93,7 @@ contract('LANDAuction', function([
   const endPrice = web3.toWei(0.1, 'ether')
   const auctionDuration = duration.days(15)
   const zeroAddress = '0x0000000000000000000000000000000000000000'
-  const landsLimit = 20
+  const landsLimitPerBid = 20
   const gasPriceLimit = 4
   const xs = [1, 2, 3, 4]
   const ys = [1, 2, 3, 4]
@@ -162,7 +162,7 @@ contract('LANDAuction', function([
     )
 
     // Start auction
-    await landAuction.startAuction(landsLimit, gasPriceLimit, fromOwner)
+    await landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromOwner)
     initialTime = getBlockchainTime()
 
     // Assign balance to bidders and allow LANDAuction to move MANA
@@ -336,16 +336,16 @@ contract('LANDAuction', function([
 
     it('should start auction', async function() {
       const { logs } = await _landAuction.startAuction(
-        landsLimit,
+        landsLimitPerBid,
         gasPriceLimit,
         fromOwner
       )
 
       logs.length.should.be.equal(3)
 
-      assertEvent(logs[0], 'LandsLimitChanged', {
-        _oldLandsLimit: '0',
-        _landsLimit: landsLimit.toString()
+      assertEvent(logs[0], 'LandsLimitPerBidChanged', {
+        _oldLandsLimitPerBid: '0',
+        _landsLimitPerBid: landsLimitPerBid.toString()
       })
 
       assertEvent(logs[1], 'GasPriceLimitChanged', {
@@ -359,24 +359,28 @@ contract('LANDAuction', function([
       })
 
       const status = await _landAuction.status()
-      const _landLimit = await _landAuction.landsLimit()
+      const _landLimit = await _landAuction.landsLimitPerBid()
       const _gasPriceLimit = await _landAuction.gasPriceLimit()
 
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.started)
-      _landLimit.should.be.bignumber.equal(landsLimit)
+      _landLimit.should.be.bignumber.equal(landsLimitPerBid)
       _gasPriceLimit.should.be.bignumber.equal(gasPriceLimit)
     })
 
     it('reverts when trying to re-start auction', async function() {
-      await _landAuction.startAuction(landsLimit, gasPriceLimit, fromOwner)
+      await _landAuction.startAuction(
+        landsLimitPerBid,
+        gasPriceLimit,
+        fromOwner
+      )
       await assertRevert(
-        _landAuction.startAuction(landsLimit, gasPriceLimit, fromOwner)
+        _landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromOwner)
       )
     })
 
     it('reverts when no-owner trying to start auction', async function() {
       await assertRevert(
-        _landAuction.startAuction(landsLimit, gasPriceLimit, fromHacker)
+        _landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromHacker)
       )
     })
 
@@ -387,27 +391,31 @@ contract('LANDAuction', function([
     })
 
     it('reverts when gasPriceLimit = 0', async function() {
-      await assertRevert(_landAuction.startAuction(landsLimit, 0, fromHacker))
+      await assertRevert(
+        _landAuction.startAuction(landsLimitPerBid, 0, fromHacker)
+      )
     })
   })
 
-  describe('setLandsLimit', function() {
+  describe('setLandsLimitPerBid', function() {
     it('should change lands limit', async function() {
-      let _landLimit = await landAuction.landsLimit()
-      _landLimit.should.be.bignumber.equal(landsLimit)
+      let _landLimit = await landAuction.landsLimitPerBid()
+      _landLimit.should.be.bignumber.equal(landsLimitPerBid)
 
-      await landAuction.setLandsLimit(40, fromOwner)
+      await landAuction.setLandsLimitPerBid(40, fromOwner)
 
-      _landLimit = await landAuction.landsLimit()
+      _landLimit = await landAuction.landsLimitPerBid()
       _landLimit.should.be.bignumber.equal(40)
     })
 
     it('revert when changing to 0', async function() {
-      await assertRevert(landAuction.setLandsLimit(0, fromOwner))
+      await assertRevert(landAuction.setLandsLimitPerBid(0, fromOwner))
     })
 
     it('revert when no-owner try to change it', async function() {
-      await assertRevert(landAuction.setLandsLimit(landsLimit, fromHacker))
+      await assertRevert(
+        landAuction.setLandsLimitPerBid(landsLimitPerBid, fromHacker)
+      )
     })
   })
 
@@ -436,14 +444,14 @@ contract('LANDAuction', function([
   describe('pause', function() {
     it('should pause', async function() {
       const { logs } = await landAuction.pause(fromOwner)
-      const price = await landAuction.getCurrentPrice()
+      const time = getBlockchainTime()
 
       logs.length.should.be.equal(2)
 
       assertEvent(logs[0], 'Paused')
-      assertEvent(logs[1], 'AuctionEnd', {
+      assertEvent(normalizeEvent(logs[1]), 'AuctionEnd', {
         _caller: owner,
-        _price: price.toString()
+        _price: getPriceWithLinearFunction(time - initialTime).toString()
       })
 
       const status = await landAuction.status()
