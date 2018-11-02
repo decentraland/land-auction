@@ -13,9 +13,7 @@ contract MANAToken {
 * @title Interface for contracts conforming to ERC-721
 */
 contract LANDRegistry {
-    function ownerOfLand(uint256 x, uint256 y) external view returns (address);
-    function assignMultipleParcels(uint256[] x, uint256[] y, address beneficiary) external;
-    function supportsInterface(bytes4) public view returns (bool);
+    function assignNewParcel(int x, int y, address beneficiary) external;
 }
 
 contract LANDAuctionStorage {
@@ -48,8 +46,8 @@ contract LANDAuctionStorage {
       address indexed _beneficiary,
       uint256 _price,
       uint256 _totalPrice,
-      uint256[] _xs,
-      uint256[] _ys
+      int[] _xs,
+      int[] _ys
     );
 
     event AuctionEnd(

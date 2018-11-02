@@ -99,7 +99,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _ys - uint256[] y values for the LANDs to bid
     * @param _beneficiary - address beneficiary for the LANDs to bid
     */
-    function bid(uint256[] _xs, uint256[] _ys, address _beneficiary) external whenNotPaused {
+    function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
         require(status == Status.started, "The auction was not started");
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
         require(_beneficiary != address(0), "The beneficiary could not be 0 address");
@@ -119,7 +119,16 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
 
         // @nacho TODO: allow LANDAuction to assign LANDs
         // Assign LANDs to _beneficiary
-        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
+        for(uint i = 0; i < _xs.length; i++) {
+            int x = _xs[i];
+            int y = _ys[i];
+            require(
+                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+            landRegistry.assignNewParcel(x, y, _beneficiary);
+        }
+
 
         emit BidSuccessful(
             _beneficiary,

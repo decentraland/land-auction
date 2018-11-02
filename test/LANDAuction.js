@@ -463,14 +463,14 @@ contract('LANDAuction', function([
   describe('finishAuction', function() {
     it('should finish auction', async function() {
       const { logs } = await landAuction.finishAuction(fromOwner)
-      const price = await landAuction.getCurrentPrice()
+      const time = getBlockchainTime()
 
       logs.length.should.be.equal(2)
 
       assertEvent(logs[0], 'Paused')
-      assertEvent(logs[1], 'AuctionEnd', {
+      assertEvent(normalizeEvent(logs[1]), 'AuctionEnd', {
         _caller: owner,
-        _price: price.toString()
+        _price: getPriceWithLinearFunction(time - initialTime).toString()
       })
 
       const status = await landAuction.status()
@@ -623,7 +623,14 @@ contract('LANDAuction', function([
       }
     })
 
-    it('reverts if try to bid assigned lands', async function() {
+    it('should bid limit LANDs', async function() {
+      await landAuction.bid([-150, 150], [-150, 150], bidder, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+    })
+
+    it('reverts if try to bid assigned LANDs', async function() {
       await landAuction.bid(xs, ys, bidder, {
         ...fromBidder,
         gasPrice: gasPriceLimit
@@ -694,6 +701,36 @@ contract('LANDAuction', function([
         landAuction.bid(xs, ys, bidder, {
           ...fromBidder,
           gasPrice: gasPriceLimit + 1
+        })
+      )
+    })
+
+    it('reverts if try to bid out of boundaries LANDs', async function() {
+      assertRevert(
+        landAuction.bid([-151], [150], bidder, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([151], [150], bidder, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([150], [-151], bidder, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([150], [151], bidder, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
         })
       )
     })
