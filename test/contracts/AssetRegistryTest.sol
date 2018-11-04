@@ -12,8 +12,10 @@ contract AssetRegistryTest is ERC721 {
         ERC721.initialize();
     }
 
-    function assignNewParcel(int x, int y, address beneficiary) external {
-        _mint(beneficiary, _encodeTokenId(x, y));
+    function assignMultipleParcels(int[] x, int[] y, address beneficiary) external {
+        for (uint256 i = 0; i < x.length; i++) {
+            super._mint(beneficiary,  _encodeTokenId(x[i], y[i]));	
+        }
     }
 
     function _encodeTokenId(int x, int y) public pure returns (uint256 result) {

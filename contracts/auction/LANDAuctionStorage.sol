@@ -13,7 +13,7 @@ contract MANAToken {
 * @title Interface for contracts conforming to ERC-721
 */
 contract LANDRegistry {
-    function assignNewParcel(int x, int y, address beneficiary) external;
+    function assignMultipleParcels(int[] x, int[] y, address beneficiary) external;
 }
 
 contract LANDAuctionStorage {

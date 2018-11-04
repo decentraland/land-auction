@@ -15,7 +15,9 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @dev Constructor of the contract
     * @param _initialPrice - uint256 initial LAND price
     * @param _endPrice - uint256 end LAND price
-    * @param _duration - uint256 duration of the auction in miliseconds
+    * @param _duration - uint256 duration of the auction in seconds
+    * @param _manaToken - address of the MANA token
+    * @param _landRegistry - address of the LANDRegistry
     */
     constructor(uint256 _initialPrice, uint256 _endPrice, uint256 _duration, address _manaToken, address _landRegistry) public {
         require(_manaToken.isContract(), "The mana token address must be a deployed contract");
@@ -24,7 +26,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         require(_landRegistry.isContract(), "The LANDRegistry token address must be a deployed contract");
         landRegistry = LANDRegistry(_landRegistry);
 
-        require(_initialPrice > 0, "The initial price should be greater than 0");
+
         require(_initialPrice > _endPrice, "The start price should be greater than end price");
         require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
 
@@ -48,7 +50,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
 
     /**
     * @dev Start the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
     * @param _gasPriceLimit - uint256 gas price limit for a single bid
     */
     function startAuction(uint256 _landsLimitPerBid, uint256 _gasPriceLimit) external onlyOwner whenNotPaused {
@@ -74,7 +76,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @return uint256 price for the given time
     */
     function _getPrice(uint256 _time) internal view returns (uint256) {
-        if (_time > duration) {
+        if (_time >= duration) {
             return endPrice;
         }
         return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
@@ -101,6 +103,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     */
     function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
         require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
         require(_beneficiary != address(0), "The beneficiary could not be 0 address");
         require(_xs.length > 0, "You should bid to at least one LAND");
@@ -117,7 +120,6 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
             "Transfering the totalPrice to LANDAuction contract failed"
         );
 
-        // @nacho TODO: allow LANDAuction to assign LANDs
         // Assign LANDs to _beneficiary
         for(uint i = 0; i < _xs.length; i++) {
             int x = _xs[i];
@@ -126,8 +128,8 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
                 -150 <= x && x <= 150 && -150 <= y && y <= 150,
                 "The coordinates should be inside bounds -150 & 150"
             );
-            landRegistry.assignNewParcel(x, y, _beneficiary);
         }
+        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
 
 
         emit BidSuccessful(

@@ -742,6 +742,17 @@ contract('LANDAuction', function([
         })
       )
     })
+
+    it('reverts if try to bid when now - initialTime > duration ', async function() {
+      await increaseTime(auctionDuration)
+      await increaseTime(duration.seconds(1))
+      await assertRevert(
+        landAuction.bid([1], [1], bidder, {
+          ...fromAnotherBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
   })
 
   describe('burnFunds', function() {
