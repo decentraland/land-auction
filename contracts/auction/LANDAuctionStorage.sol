@@ -6,12 +6,11 @@ import "../dex/ITokenConverter.sol";
 >>>>>>> feat: kyber dex
 
 /**
-* @title Interface for MANA token conforming to ERC-20
+* @title ERC20 Interface with burn
+* @dev IERC20 imported in ItokenConverter.sol
 */
-contract MANAToken {
-    function balanceOf(address who) public view returns (uint256);
+contract ERC20 is IERC20 {
     function burn(uint256 _value) public;
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
 
@@ -24,14 +23,14 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
-    bytes4 public constant ACEPTED_ERC20 = 0x34;
     enum Status { created, started, finished }
 
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
-    MANAToken public manaToken;
+    ERC20 public manaToken;
     LANDRegistry public landRegistry;
+    mapping (address => bool) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -84,7 +83,17 @@ contract LANDAuctionStorage {
 
     event DexChanged(
       address indexed _caller,
-      address _oldDex,
-      address _dex
+      address indexed _oldDex,
+      address indexed _dex
+    );
+
+    event TokenAllowed(
+      address indexed _caller,
+      address indexed _address
+    );
+
+    event TokenDisabled(
+      address indexed _caller,
+      address indexed _address
     );
 }
