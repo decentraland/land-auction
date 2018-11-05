@@ -16,18 +16,21 @@ contract KyberMock is IKyberNetwork {
         dclToken = _dclToken;
     }
 
-    function swapTokenToToken(
+    function trade(
         IERC20 _fromToken,
         uint _fromAmount,
         IERC20 _toToken,
-        uint _minConversionRate
+        address _destAddress, 
+        uint /* _maxFromAmount */,	
+        uint _minConversionRate,	
+        address /* _walletId */
     ) public payable returns(uint256) {
         uint256 rate;
         (rate, ) = getExpectedRate(_toToken, _fromToken, _fromAmount);
         require(rate > _minConversionRate, "Rate is to low");
         require(_fromToken.transferFrom(msg.sender, this, _fromAmount), "Could not transfer");
         uint256 destAmount = convertRate(_fromAmount, rate);
-        require(_toToken.transfer(msg.sender, destAmount), "Could not transfer");
+        require(_toToken.transfer(_destAddress, destAmount), "Could not transfer");
         return destAmount;
     }
 

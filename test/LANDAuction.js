@@ -159,7 +159,7 @@ contract('LANDAuction', function([
     await manaToken.mint(web3.toWei(10, 'ether'), kyberMock.address)
 
     // Create KyberConverter
-    kyberConverter = await KyberConverter.new(kyberMock.address)
+    kyberConverter = await KyberConverter.new(kyberMock.address, owner)
     // Create a LANDAuction
     landAuction = await LANDAuction.new(
       initialPrice,
@@ -633,10 +633,16 @@ contract('LANDAuction', function([
 
   describe('bid', function() {
     it('should bid', async function() {
-      const { logs } = await landAuction.bid(xs, ys, bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
+      const { logs } = await landAuction.bid(
+        xs,
+        ys,
+        bidder,
+        manaToken.address,
+        {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        }
+      )
 
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
@@ -696,7 +702,7 @@ contract('LANDAuction', function([
     })
 
     it('should assign LANDs to beneficiary', async function() {
-      await landAuction.bid(xs, ys, anotherBidder, {
+      await landAuction.bid(xs, ys, anotherBidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
@@ -709,155 +715,23 @@ contract('LANDAuction', function([
     })
 
     it('should bid limit LANDs', async function() {
-      await landAuction.bid([-150, 150], [-150, 150], bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-    })
-
-    it('should bid with less gas Price', async function() {
-      await landAuction.bid([-150, 150], [-150, 150], bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit - 1
-      })
-    })
-
-    it('reverts if user bids assigned LANDs', async function() {
-      await landAuction.bid(xs, ys, bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      await assertRevert(
-        landAuction.bid([1], [1], bidder, {
-          ...fromAnotherBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-
-      await assertRevert(
-        landAuction.bid([1], [1], anotherBidder, {
-          ...fromAnotherBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if bidder has insufficient funds', async function() {
-      await assertRevert(
-        landAuction.bid(xs, ys, bidderWithoutFunds, {
-          ...fromBidderWithoutFunds,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if bidder has not approved MANA', async function() {
-      await manaToken.approve(
-        landAuction.address,
-        web3.toWei(0.1, 'ether'),
-        fromBidder
-      )
-
-      await assertRevert(
-        landAuction.bid(xs, ys, bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if auction is finished', async function() {
-      await landAuction.finishAuction(fromOwner)
-      await assertRevert(
-        landAuction.bid(xs, ys, bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if user bids for empty LAND', async function() {
-      await assertRevert(
-        landAuction.bid([], [], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if user bids for invalid coordinates', async function() {
-      await assertRevert(
-        landAuction.bid([1, 2], [3], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if transaction exceeds gas price limit', async function() {
-      await assertRevert(
-        landAuction.bid(xs, ys, bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit + 1
-        })
-      )
-    })
-
-    it('reverts if user bids out of boundaries LANDs', async function() {
-      assertRevert(
-        landAuction.bid([-151], [150], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-
-      assertRevert(
-        landAuction.bid([151], [150], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-
-      assertRevert(
-        landAuction.bid([150], [-151], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-
-      assertRevert(
-        landAuction.bid([150], [151], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-
-    it('reverts if user bids when now - initialTime > duration ', async function() {
-      await increaseTime(auctionDuration)
-      await increaseTime(duration.seconds(1))
-      await assertRevert(
-        landAuction.bid([1], [1], bidder, {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        })
-      )
-    })
-  })
-
-  describe('bidWithToken', function() {
-    it('should bid with other tokens', async function() {
-      const { logs } = await landAuction.bidWithToken(
-        xs,
-        ys,
+      await landAuction.bid(
+        [-150, 150],
+        [-150, 150],
         bidder,
-        nchToken.address,
+        manaToken.address,
         {
           ...fromBidder,
           gasPrice: gasPriceLimit
         }
       )
+    })
+
+    it('should bid with other tokens', async function() {
+      const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
 
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
@@ -888,10 +762,140 @@ contract('LANDAuction', function([
       balance.should.be.bignumber.equal(logs[0].args._totalPrice)
     })
 
+    it('should bid with less gas Price', async function() {
+      await landAuction.bid([-150, 150], [-150, 150], bidder, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit - 1
+      })
+    })
+
+    it('reverts if user bids assigned LANDs', async function() {
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      await assertRevert(
+        landAuction.bid([1], [1], bidder, manaToken.address, {
+          ...fromAnotherBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      await assertRevert(
+        landAuction.bid([1], [1], anotherBidder, {
+          ...fromAnotherBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if bidder has insufficient funds', async function() {
+      await assertRevert(
+        landAuction.bid(xs, ys, bidderWithoutFunds, manaToken.address, {
+          ...fromBidderWithoutFunds,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if bidder has not approved MANA', async function() {
+      await manaToken.approve(
+        landAuction.address,
+        web3.toWei(0.1, 'ether'),
+        fromBidder
+      )
+
+      await assertRevert(
+        landAuction.bid(xs, ys, bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if auction is finished', async function() {
+      await landAuction.finishAuction(fromOwner)
+      await assertRevert(
+        landAuction.bid(xs, ys, bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if user bids for empty LAND', async function() {
+      await assertRevert(
+        landAuction.bid([], [], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if user bids for invalid coordinates', async function() {
+      await assertRevert(
+        landAuction.bid([1, 2], [3], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if transaction exceeds gas price limit', async function() {
+      await assertRevert(
+        landAuction.bid(xs, ys, bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit + 1
+        })
+      )
+    })
+
+    it('reverts if user bids out of boundaries LANDs', async function() {
+      assertRevert(
+        landAuction.bid([-151], [150], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([151], [150], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([150], [-151], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+
+      assertRevert(
+        landAuction.bid([150], [151], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if user bids when now - initialTime > duration ', async function() {
+      await increaseTime(auctionDuration)
+      await increaseTime(duration.seconds(1))
+      await assertRevert(
+        landAuction.bid([1], [1], bidder, manaToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
     it('reverts if dex is not a valid contract', async function() {
       await landAuction.setDex(0, fromOwner)
       await assertRevert(
-        landAuction.bidWithToken(xs, ys, bidder, nchToken.address, {
+        landAuction.bid(xs, ys, bidder, nchToken.address, {
           ...fromBidder,
           gasPrice: gasPriceLimit
         })
@@ -902,7 +906,7 @@ contract('LANDAuction', function([
   describe('burnFunds', function() {
     it('should burnFunds', async function() {
       await increaseTime(duration.days(3))
-      await landAuction.bid(xs, ys, bidder, {
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })

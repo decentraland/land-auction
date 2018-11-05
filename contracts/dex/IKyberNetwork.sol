@@ -4,11 +4,15 @@ import "openzeppelin-eth/contracts/token/ERC20/IERC20.sol";
 
 
 contract IKyberNetwork {
-    function swapTokenToToken(
+    function trade(
         IERC20 _fromToken,
         uint _fromAmount,
         IERC20 _toToken,
-        uint _minConversionRate) 
+        address _destAddress, 
+        uint _maxFromAmount,	
+        uint _minConversionRate,	
+        address _walletId
+        ) 
         public payable returns(uint);
 
     function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint _fromAmount) 
