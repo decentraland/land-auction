@@ -36,7 +36,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(address(_landRegistry).isContract(), "The LANDRegistry token address must be a deployed contract");
         landRegistry = _landRegistry;
 
-        setDex(_dex);
+        if (_dex != address(0)) {
+            setDex(_dex);
+        }
 
         allowToken(address(_manaToken));
         manaToken = _manaToken;
@@ -101,7 +103,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _fromToken - ERC20 accepted
     */
     function bidWithToken(int[] _xs, int[] _ys, address _beneficiary, ERC20 _fromToken) external whenNotPaused {
-        //require(address(dex).isContract(), "Dex not available");
+        require(address(dex).isContract(), "Pay with token is not available");
         _bid(_xs, _ys, _beneficiary, _fromToken);
     }
 
@@ -139,7 +141,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         if (address(_fromToken) != address(manaToken)) {
             // Convert _fromToken to MANA
-            require(convertSafe(_fromToken, totalPrice), "all good");
+            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -162,6 +164,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         emit BidSuccessful(
             _beneficiary,
+            _fromToken,
             currentPrice,
             totalPrice,
             _xs,
@@ -236,10 +239,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _dex - address of the token converter
     */
     function setDex(address _dex) public onlyOwner {
+        require(_dex != address(dex), "The dex is the current");
         if (_dex != address(0)) {
             require(_dex.isContract(), "The dex address must be a deployed contract");
-            emit DexChanged(msg.sender, dex, _dex);
         }
+        emit DexChanged(msg.sender, dex, _dex);
         dex = ITokenConverter(_dex);
     }
 
@@ -283,7 +287,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
         return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
     }
-
+    
+    /**
+    * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
+    * @param _fromToken - ERC20 token to be converted
+    * @param _totalPrice - uint256 of the total amount in MANA
+    * @return bool to confirm the convertion was successfully
+    */
     function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
         uint256 prevBalance = manaToken.balanceOf(address(this));
         uint256 tokenRate;

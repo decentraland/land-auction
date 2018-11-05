@@ -30,13 +30,13 @@ contract LANDAuctionStorage {
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
+    ITokenConverter public dex;
     mapping (address => bool) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
     uint256 internal startedTime;
     uint256 internal duration;
-    ITokenConverter internal dex;
 
     event AuctionCreated(
       address indexed _caller,
@@ -52,6 +52,7 @@ contract LANDAuctionStorage {
 
     event BidSuccessful(
       address indexed _beneficiary,
+      address indexed _token,
       uint256 _price,
       uint256 _totalPrice,
       int[] _xs,
