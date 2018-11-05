@@ -7,6 +7,7 @@ import "openzeppelin-eth/contracts/utils/Address.sol";
 
 import "./LANDAuctionStorage.sol";
 
+
 contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
@@ -19,11 +20,24 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     */
-    constructor(uint256 _initialPrice, uint256 _endPrice, uint256 _duration, address _manaToken, address _landRegistry) public {
-        require(_manaToken.isContract(), "The mana token address must be a deployed contract");
+    constructor(
+        uint256 _initialPrice, 
+        uint256 _endPrice, 
+        uint256 _duration, 
+        address _manaToken, 
+        address _landRegistry
+    ) public 
+    {
+        require(
+            _manaToken.isContract(),
+            "The mana token address must be a deployed contract"
+        );
         manaToken = MANAToken(_manaToken);
 
-        require(_landRegistry.isContract(), "The LANDRegistry token address must be a deployed contract");
+        require(
+            _landRegistry.isContract(),
+            "The LANDRegistry token address must be a deployed contract"
+        );
         landRegistry = LANDRegistry(_landRegistry);
 
 
@@ -45,7 +59,12 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         Ownable.initialize(msg.sender);
         Pausable.initialize(msg.sender);
 
-        emit AuctionCreated(msg.sender, initialPrice, endPrice, duration);
+        emit AuctionCreated(
+            msg.sender,
+            initialPrice, 
+            endPrice, 
+            duration
+        );
     }
 
     /**
@@ -53,7 +72,12 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
     * @param _gasPriceLimit - uint256 gas price limit for a single bid
     */
-    function startAuction(uint256 _landsLimitPerBid, uint256 _gasPriceLimit) external onlyOwner whenNotPaused {
+    function startAuction(
+        uint256 _landsLimitPerBid,
+        uint256 _gasPriceLimit
+    ) 
+    external onlyOwner whenNotPaused 
+    {
         require(status == Status.created, "The auction was started");
 
         setLandsLimitPerBid(_landsLimitPerBid);
@@ -65,37 +89,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         emit AuctionStarted(msg.sender, startedTime);
     }
 
-    /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startedTime)
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * It should return endPrice if _time < duration
-    * @param _time - uint256 time passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _getPrice(uint256 _time) internal view returns (uint256) {
-        if (_time >= duration) {
-            return endPrice;
-        }
-        return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
-    }
-
-    /**
-    * @dev Current LAND price. If the auction was not started returns the started price
-    * @return uint256 current LAND price
-    */
-    function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
-            return _getPrice(0);
-        } else {
-            uint256 timePassed = block.timestamp - startedTime;
-            return _getPrice(timePassed);
-        }
-    }
-
-    /**
+     /**
     * @dev Make a bid for LANDs
     * @param _xs - uint256[] x values for the LANDs to bid
     * @param _ys - uint256[] y values for the LANDs to bid
@@ -121,7 +115,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         );
 
         // Assign LANDs to _beneficiary
-        for(uint i = 0; i < _xs.length; i++) {
+        for (uint i = 0; i < _xs.length; i++) {
             int x = _xs[i];
             int y = _ys[i];
             require(
@@ -160,6 +154,19 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     }
 
     /**
+    * @dev Current LAND price. If the auction was not started returns the started price
+    * @return uint256 current LAND price
+    */
+    function getCurrentPrice() public view returns (uint256) { 
+        if (startedTime == 0) {
+            return _getPrice(0);
+        } else {
+            uint256 timePassed = block.timestamp - startedTime;
+            return _getPrice(timePassed);
+        }
+    }
+
+    /**
     * @dev pause auction 
     */
     function pause() public onlyOwner whenNotPaused {
@@ -195,5 +202,22 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         require(_gasPriceLimit > 0, "The gas price should be greater than 0");
         emit GasPriceLimitChanged(gasPriceLimit, _gasPriceLimit);
         gasPriceLimit = _gasPriceLimit;
+    }
+
+     /**
+    * @dev Calculate LAND price based on time
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
+    * slope = (endPrice - startedPrice) / (duration - startedTime)
+    * As Solidity does not support negative number we use it as: y = b - ax
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256) {
+        if (_time >= duration) {
+            return endPrice;
+        }
+        return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
     }
 }

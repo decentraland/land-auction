@@ -1,5 +1,6 @@
 pragma solidity ^0.4.24;
 
+
 /**
 * @title Interface for MANA token conforming to ERC-20
 */
@@ -9,12 +10,14 @@ contract MANAToken {
     function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
+
 /**
 * @title Interface for contracts conforming to ERC-721
 */
 contract LANDRegistry {
     function assignMultipleParcels(int[] x, int[] y, address beneficiary) external;
 }
+
 
 contract LANDAuctionStorage {
     enum Status { created, started, finished }
