@@ -229,7 +229,7 @@ contract('LANDAuction', function([
         fromOwner
       )
 
-      const logs = await getEvents(_landAuction, 'AuctionCreated')
+      let logs = await getEvents(_landAuction, 'AuctionCreated')
       logs.length.should.be.equal(1)
       assertEvent(logs[0], 'AuctionCreated', {
         _caller: owner,
@@ -238,7 +238,12 @@ contract('LANDAuction', function([
         _duration: auctionDuration.toString()
       })
 
-      //@nacho TODO: assert other events
+      logs = await getEvents(_landAuction, 'TokenAllowed')
+      logs.length.should.be.equal(1)
+      assertEvent(logs[0], 'TokenAllowed', {
+        _caller: owner,
+        _address: manaToken.address
+      })
 
       const currentLANDPrice = await _landAuction.getCurrentPrice()
       currentLANDPrice.should.be.bignumber.equal(initialPrice)
@@ -400,7 +405,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: dex not a contract address', async function() {
+    it('reverts if instanciate with incorrect values :: dex not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -415,7 +420,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: AllowedTokens not a contract address', async function() {
+    it('reverts if instanciate with incorrect values :: AllowedTokens not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -643,6 +648,7 @@ contract('LANDAuction', function([
         'BidSuccessful',
         {
           _beneficiary: bidder,
+          _token: manaToken.address,
           _price: price.toString(),
           _totalPrice: (price * xs.length).toString(),
           _xs: xs,
@@ -840,6 +846,59 @@ contract('LANDAuction', function([
     })
   })
 
+  describe('bidWithToken', function() {
+    it('should bid with other tokens', async function() {
+      const { logs } = await landAuction.bidWithToken(
+        xs,
+        ys,
+        bidder,
+        nchToken.address,
+        {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        }
+      )
+
+      const time = getBlockchainTime(logs[0].blockNumber)
+      const price = getPriceWithLinearFunction(time - initialTime)
+
+      logs.length.should.be.equal(1)
+
+      assertEvent(
+        normalizeEvent(logs[0]),
+        'BidSuccessful',
+        {
+          _beneficiary: bidder,
+          _token: nchToken.address,
+          _price: price.toString(),
+          _totalPrice: (price * xs.length).toString(),
+          _xs: xs,
+          _ys: ys
+        },
+        true
+      )
+
+      for (let i = 0; i < xs.length; i++) {
+        const id = await landRegistry._encodeTokenId(xs[i], ys[i])
+        const address = await landRegistry.ownerOf(id)
+        address.should.be.equal(bidder)
+      }
+
+      const balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+    })
+
+    it('reverts if dex is not a valid contract', async function() {
+      await landAuction.setDex(0, fromOwner)
+      await assertRevert(
+        landAuction.bidWithToken(xs, ys, bidder, nchToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+  })
+
   describe('burnFunds', function() {
     it('should burnFunds', async function() {
       await increaseTime(duration.days(3))
@@ -884,51 +943,106 @@ contract('LANDAuction', function([
     })
   })
 
-  describe('bidWithToken', function() {
-    it.only('should bid with other tokens', async function() {
-      const { logs } = await landAuction.bidWithToken(
-        xs,
-        ys,
-        bidder,
-        nchToken.address,
-        {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        }
-      )
+  describe('setDex', function() {
+    it('should set dex', async function() {
+      let address = await landAuction.dex()
+      address.should.be.equal(kyberConverter.address)
 
-      const time = getBlockchainTime(logs[0].blockNumber)
-      const price = getPriceWithLinearFunction(time - initialTime)
+      const { logs } = await landAuction.setDex(0, fromOwner)
 
-      logs.length.should.be.equal(1)
+      assertEvent(logs[0], 'DexChanged', {
+        _caller: owner,
+        _oldDex: kyberConverter.address,
+        _dex: zeroAddress
+      })
 
-      assertEvent(
-        normalizeEvent(logs[0]),
-        'BidSuccessful',
-        {
-          _beneficiary: bidder,
-          _price: price.toString(),
-          _totalPrice: (price * xs.length).toString(),
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      address = await landAuction.dex()
+      address.should.be.equal(zeroAddress)
 
-      for (let i = 0; i < xs.length; i++) {
-        const id = await landRegistry._encodeTokenId(xs[i], ys[i])
-        const address = await landRegistry.ownerOf(id)
-        address.should.be.equal(bidder)
-      }
+      await landAuction.setDex(kyberConverter.address, fromOwner)
+      address = await landAuction.dex()
+      address.should.be.equal(kyberConverter.address)
+    })
 
-      const balance = await manaToken.balanceOf(landAuction.address)
-      balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+    it('reverts when changing to an address which is not a  contract', async function() {
+      await assertRevert(landAuction.setDex(bidder, fromOwner))
+    })
+
+    it('reverts when trying to change to the current one', async function() {
+      await assertRevert(landAuction.setDex(kyberConverter.address, fromOwner))
+    })
+
+    it('reverts when no-owner try to change it', async function() {
+      await assertRevert(landAuction.setDex(0, fromHacker))
     })
   })
 
-  //@nacho TODO: setDex tests
-  //@nacho TODO: setAllowedToken tests
-  //@nacho TODO: add token bidded
-  //@nacho TODO: dev notation
+  describe('allowToken', function() {
+    it('should allowToken', async function() {
+      const erc20 = await ERC20Token.new(creationParams)
+
+      let res = await landAuction.tokensAllowed(erc20.address)
+      res.should.be.equal(false)
+
+      const { logs } = await landAuction.allowToken(erc20.address, fromOwner)
+
+      assertEvent(logs[0], 'TokenAllowed', {
+        _caller: owner,
+        _address: erc20.address
+      })
+
+      res = await landAuction.tokensAllowed(erc20.address)
+      res.should.be.equal(true)
+    })
+
+    it('reverts when allow a token already allowed', async function() {
+      await assertRevert(landAuction.allowToken(manaToken.address, fromOwner))
+    })
+
+    it('reverts when trying to allow not a contract', async function() {
+      await assertRevert(landAuction.allowToken(bidder, fromOwner))
+      await assertRevert(landAuction.allowToken(0, fromOwner))
+    })
+
+    it('reverts when no-owner try to change it', async function() {
+      const erc20 = await ERC20Token.new(creationParams)
+      await assertRevert(landAuction.allowToken(erc20.address, fromHacker))
+    })
+  })
+
+  describe('disableToken', function() {
+    it('should disableToken', async function() {
+      const erc20 = await ERC20Token.new(creationParams)
+
+      await landAuction.allowToken(erc20.address, fromOwner)
+      let res = await landAuction.tokensAllowed(erc20.address)
+      res.should.be.equal(true)
+
+      const { logs } = await landAuction.disableToken(erc20.address, fromOwner)
+
+      assertEvent(logs[0], 'TokenDisabled', {
+        _caller: owner,
+        _address: erc20.address
+      })
+
+      res = await landAuction.tokensAllowed(erc20.address)
+      res.should.be.equal(false)
+    })
+
+    it('reverts when allow a token already allowed', async function() {
+      await landAuction.disableToken(manaToken.address, fromOwner)
+      await assertRevert(landAuction.disableToken(manaToken.address, fromOwner))
+
+      const erc20 = await ERC20Token.new(creationParams)
+      await assertRevert(landAuction.disableToken(erc20.address, fromOwner))
+    })
+
+    it('reverts when no-owner try to change it', async function() {
+      await assertRevert(
+        landAuction.disableToken(manaToken.address, fromHacker)
+      )
+    })
+  })
+  //@nacho TODO: add token bidded with real check of reserves
   //@nacho TODO: change to swapTokenToToken
 })

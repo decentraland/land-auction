@@ -3,6 +3,11 @@ pragma solidity ^0.4.24;
 import "./ITokenConverter.sol";
 import "./IKyberNetwork.sol";
 
+/**
+* @dev Contract to encapsulate Kyber methods which implements ITokenConverter.
+* Note that need to create it with a valid kyber address
+*/
+
 contract KyberConverter is ITokenConverter {
     IKyberNetwork internal  kyber;
     uint256 private constant MAX_UINT = uint256(0) - 1;
@@ -11,15 +16,20 @@ contract KyberConverter is ITokenConverter {
         kyber = _kyber;
     }
 
-    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint _fromAmount) public view returns(uint expectedRate, uint slippageRate) {
+    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
+        public view returns(uint256 expectedRate, uint256 slippageRate) {
         (expectedRate, slippageRate) = kyber.getExpectedRate(_fromToken, _toToken, _fromAmount);
     }
     
-    function getReturn(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) external view returns (uint256 amount) {
-        (amount,) = getExpectedRate(_fromToken, _toToken, _fromAmount);
+    function getReturn(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
+        external view returns (uint256 amount) {
+        uint256 rate;
+        (rate, ) = getExpectedRate(_fromToken, _toToken, _fromAmount);
+        amount = _fromAmount.mul(rate).div(10 ** 18);
     }
     
-    function convert(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount, uint256 _minReturn) external payable returns (uint256 amount) {
+    function convert(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount, uint256 _minReturn) 
+        external payable returns (uint256 amount) {
         // Transfer tokens to be converted from msg.sender to this contract
         require(
             _fromToken.transferFrom(msg.sender, address(this), _fromAmount),
@@ -30,8 +40,8 @@ contract KyberConverter is ITokenConverter {
             _fromToken.approve(kyber, _fromAmount),
             "Could not approve kyber to use _fromToken on behalf of this contract"
         );
-        // Trade _fromAmount from _fromToken to _toToken with a max
-        amount = kyber.trade(_fromToken, _fromAmount, _toToken, address(this), MAX_UINT, 1, 0x0);
+        // Swap _fromAmount from _fromToken to _toToken
+        amount = kyber.swapTokenToToken(_fromToken, _fromAmount, _toToken, 1);
         // Clean kyber to use _fromTokens on belhalf of this contract
         require(
             _fromToken.approve(kyber, 0),

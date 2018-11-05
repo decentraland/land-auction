@@ -1,11 +1,8 @@
 pragma solidity ^0.4.24;
 
 import "contracts/dex/IKyberNetwork.sol";
-import "openzeppelin-eth/contracts/math/SafeMath.sol";
 
 contract KyberMock is IKyberNetwork {
-    using SafeMath for uint256;
-
     uint256 constant public rate_NCH_MANA = 1262385660474240000; // 1.262 - 18 decimals
     uint256 constant public rate_DCL_MANA = 2562385660474240000; // 2.562 - 18 decimals
     uint256 public rate_MANA_NCH = 792150949832820000; // 100 / rate_NCH_MANA
@@ -19,22 +16,18 @@ contract KyberMock is IKyberNetwork {
         dclToken = _dclToken;
     }
 
-    function trade(
+    function swapTokenToToken(
         IERC20 _fromToken,
         uint _fromAmount,
         IERC20 _toToken,
-        address _destAddress,
-        uint _maxDestAmount,
-        uint _minConversionRate,
-        address /* walletId */
-    ) public payable returns(uint) {
+        uint _minConversionRate
+    ) public payable returns(uint256) {
         uint256 rate;
         (rate, ) = getExpectedRate(_toToken, _fromToken, _fromAmount);
         require(rate > _minConversionRate, "Rate is to low");
         require(_fromToken.transferFrom(msg.sender, this, _fromAmount), "Could not transfer");
         uint256 destAmount = convertRate(_fromAmount, rate);
-        require(destAmount < _maxDestAmount, "amount is bigger than maximum");
-        require(_toToken.transfer(_destAddress, destAmount), "Could not transfer");
+        require(_toToken.transfer(msg.sender, destAmount), "Could not transfer");
         return destAmount;
     }
 
@@ -42,8 +35,8 @@ contract KyberMock is IKyberNetwork {
         return (amount * rate) / 10**18;
     }
 
-    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint /* _fromAmount */) 
-        public view returns(uint, uint) {
+    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint256 /* _fromAmount */) 
+        public view returns(uint256, uint256) {
         if (_fromToken == nchToken) {
             return (rate_NCH_MANA, rate_NCH_MANA);
         } else if (_fromToken == dclToken) {
