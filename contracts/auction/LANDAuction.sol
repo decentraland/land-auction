@@ -104,6 +104,19 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
+    * @dev Current LAND price. If the auction was not started returns the started price
+    * @return uint256 current LAND price
+    */
+    function getCurrentPrice() public view returns (uint256) { 
+        if (startedTime == 0) {
+            return _getPrice(0);
+        } else {
+            uint256 timePassed = block.timestamp - startedTime;
+            return _getPrice(timePassed);
+        }
+    }
+
+    /**
     * @dev Make a bid for LANDs
     * @param _xs - uint256[] x values for the LANDs to bid
     * @param _ys - uint256[] y values for the LANDs to bid
@@ -115,7 +128,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         int[] _ys, 
         address _beneficiary, 
         ERC20 _fromToken
-    ) external 
+    ) external whenNotPaused 
     {
         require(status == Status.started, "The auction was not started");
         require(block.timestamp - startedTime <= duration, "The auction has finished");
@@ -124,7 +137,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_xs.length > 0, "You should bid to at least one LAND");
         require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
         require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
+        require(tokensAllowed[address(_fromToken)], "token not accepted");
 
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -164,41 +177,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _xs,
             _ys
         );
-    }
-
-    /**
-    * @dev Allow many ERC20 tokens to to be used for bidding
-    * @param _address - array of addresses of the ERC20 Token
-    * @param _decimals - array of uint256 of the number of decimals
-    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
-    */
-    function allowManyTokens(
-        address[] _address, 
-        uint256[] _decimals, 
-        bool[] _shouldKeepToken
-    ) external onlyOwner
-    {
-        require(
-            _address.length == _decimals.length && _decimals.length == _shouldKeepToken.length,
-            "The length of _addresses, decimals and _shouldKeepToken should be the same"
-        );
-
-        for (uint i = 0; i < _address.length; i++) {
-            allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
-        }
-    }
-
-    /**
-    * @dev Current LAND price. If the auction was not started returns the started price
-    * @return uint256 current LAND price
-    */
-    function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
-            return _getPrice(0);
-        } else {
-            uint256 timePassed = block.timestamp - startedTime;
-            return _getPrice(timePassed);
-        }
     }
 
     /**
