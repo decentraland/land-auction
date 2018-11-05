@@ -5,6 +5,7 @@ pragma solidity ^0.4.24;
 import "../dex/ITokenConverter.sol";
 >>>>>>> feat: kyber dex
 
+
 /**
 * @title ERC20 Interface with burn
 * @dev IERC20 imported in ItokenConverter.sol
