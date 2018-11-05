@@ -54,8 +54,7 @@ contract KyberConverter is ITokenConverter {
             minRate,
             walletId
         );
-        
-        // Clean kyber to use _srcTokens on belhalf of this contract
+
         require(
             _srcToken.approve(kyber, 0),
             "Could not clean approval of kyber to use _srcToken on behalf of this contract"
