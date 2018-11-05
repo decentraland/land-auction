@@ -1,9 +1,6 @@
 pragma solidity ^0.4.24;
 
-<<<<<<< HEAD
-=======
 import "../dex/ITokenConverter.sol";
->>>>>>> feat: kyber dex
 
 
 /**
