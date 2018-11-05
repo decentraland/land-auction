@@ -97,44 +97,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Make a bid for LANDs
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
-    * @param _beneficiary - address beneficiary for the LANDs to bid
-    * @param _fromToken - ERC20 accepted
-    */
-    function bidWithToken(
-        int[] _xs,
-        int[] _ys,
-        address _beneficiary,
-        ERC20 _fromToken
-    ) external whenNotPaused 
-    {
-        require(address(dex).isContract(), "Pay with token is not available");
-        _bid(
-            _xs,
-            _ys, 
-            _beneficiary,
-            _fromToken
-        );
-    }
-
-    /**
-    * @dev Make a bid for LANDs
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
-    * @param _beneficiary - address beneficiary for the LANDs to bid
-    */
-    function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
-        _bid(
-            _xs,
-            _ys,
-            _beneficiary,
-            manaToken
-        );
-    }
-
-    /**
     * @dev Burn the MANA earned by the auction
     */
     function burnFunds() external {
@@ -163,6 +125,69 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             uint256 timePassed = block.timestamp - startedTime;
             return _getPrice(timePassed);
         }
+    }
+
+    /**
+    * @dev Make a bid for LANDs
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function bid(
+        int[] _xs, 
+        int[] _ys, 
+        address _beneficiary, 
+        ERC20 _fromToken
+    ) external whenNotPaused 
+    {
+        require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
+        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
+        require(_xs.length > 0, "You should bid to at least one LAND");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
+        require(tokensAllowed[address(_fromToken)], "token not accepted");
+
+        uint256 currentPrice = getCurrentPrice();
+        uint256 totalPrice = _xs.length.mul(currentPrice);
+
+        if (address(_fromToken) != address(manaToken)) {
+            require(
+                address(dex).isContract(), 
+                "Pay with other token than MANA is not available"
+            );
+            // Convert _fromToken to MANA
+            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+        } else {
+            // Transfer MANA to LANDAuction contract
+            require(
+                _fromToken.transferFrom(msg.sender, address(this), totalPrice),
+                "Transfering the totalPrice to LANDAuction contract failed"
+            );
+        }
+
+        // Assign LANDs to _beneficiary
+        for (uint i = 0; i < _xs.length; i++) {
+            int x = _xs[i];
+            int y = _ys[i];
+            require(
+                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+        }
+        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
+
+
+        emit BidSuccessful(
+            _beneficiary,
+            _fromToken,
+            currentPrice,
+            totalPrice,
+            _xs,
+            _ys
+        );
     }
 
     /**
@@ -234,19 +259,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Current LAND price. If the auction was not started returns the started price
-    * @return uint256 current LAND price
-    */
-    function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
-            return _getPrice(0);
-        } else {
-            uint256 timePassed = block.timestamp - startedTime;
-            return _getPrice(timePassed);
-        }
-    }
-
-    /**
     * @dev Calculate LAND price based on time
     * It is a linear function y = ax - b. But The slope should be negative.
     * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
@@ -261,67 +273,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             return endPrice;
         }
         return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
-    }
-
-    /**
-    * @dev Make a bid for LANDs
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
-    * @param _beneficiary - address beneficiary for the LANDs to bid
-    * @param _fromToken - token used to bid
-    */
-    function _bid(
-        int[] _xs, 
-        int[] _ys, 
-        address _beneficiary, 
-        ERC20 _fromToken
-    ) internal 
-    {
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
-        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
-        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
-        require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
-        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)], "token not accepted");
-
-
-        uint256 amount = _xs.length;
-        uint256 currentPrice = getCurrentPrice();
-        uint256 totalPrice = amount.mul(currentPrice);
-
-        if (address(_fromToken) != address(manaToken)) {
-            // Convert _fromToken to MANA
-            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
-        } else {
-            // Transfer MANA to LANDAuction contract
-            require(
-                _fromToken.transferFrom(msg.sender, address(this), totalPrice),
-                "Transfering the totalPrice to LANDAuction contract failed"
-            );
-        }
-
-        // Assign LANDs to _beneficiary
-        for (uint i = 0; i < _xs.length; i++) {
-            int x = _xs[i];
-            int y = _ys[i];
-            require(
-                -150 <= x && x <= 150 && -150 <= y && y <= 150,
-                "The coordinates should be inside bounds -150 & 150"
-            );
-        }
-        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
-
-
-        emit BidSuccessful(
-            _beneficiary,
-            _fromToken,
-            currentPrice,
-            totalPrice,
-            _xs,
-            _ys
-        );
     }
 
     /**

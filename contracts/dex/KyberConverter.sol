@@ -11,11 +11,13 @@ import "./IKyberNetwork.sol";
 contract KyberConverter is ITokenConverter {
     IKyberNetwork internal  kyber;
     uint256 private constant MAX_UINT = uint256(0) - 1;
+    address internal walletId;
 
-    constructor (IKyberNetwork _kyber) public {
+    constructor (IKyberNetwork _kyber, address _walletId) public {
         kyber = _kyber;
+        walletId = _walletId;
     }
-    
+ 
     function getReturn(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
     external view returns (uint256 amount) 
     {
@@ -41,13 +43,16 @@ contract KyberConverter is ITokenConverter {
             _fromToken.approve(kyber, _fromAmount),
             "Could not approve kyber to use _fromToken on behalf of this contract"
         );
-        // Swap _fromAmount from _fromToken to _toToken
-        amount = kyber.swapTokenToToken(
-                _fromToken,
-                _fromAmount,
-                _toToken,
-                1
-            );
+        // Trade _fromAmount from _fromToken to _toToken
+        amount = kyber.trade(
+            _fromToken,
+            _fromAmount,
+            _toToken,
+            address(this),
+            MAX_UINT,
+            _minReturn,
+            walletId
+        );
         // Clean kyber to use _fromTokens on belhalf of this contract
         require(
             _fromToken.approve(kyber, 0),
