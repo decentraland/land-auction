@@ -727,12 +727,25 @@ contract('LANDAuction', function([
       )
     })
 
+    it('should bid with MANA token without dex', async function() {
+      await landAuction.setDex(0, fromOwner)
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+    })
+
     it('should bid with other tokens', async function() {
+      // Get prev balance of bidder of NCH token
+      const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
+
+      // Bid
       const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
 
+      // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
 
@@ -752,14 +765,24 @@ contract('LANDAuction', function([
         true
       )
 
+      // Check LANDs were assigned
       for (let i = 0; i < xs.length; i++) {
         const id = await landRegistry._encodeTokenId(xs[i], ys[i])
         const address = await landRegistry.ownerOf(id)
         address.should.be.equal(bidder)
       }
 
+      // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+
+      // Check reserve of kyber and balance of bidder
+      const kyberNCHBalance = await nchToken.balanceOf(kyberMock.address)
+      const bidderNCHBalance = await nchToken.balanceOf(bidder)
+      kyberNCHBalance.should.be.bignumber.gt(0)
+      kyberNCHBalance.should.be.bignumber.equal(
+        bidderNCHPrevBalance.minus(bidderNCHBalance)
+      )
     })
 
     it('reverts if user bids assigned LANDs', async function() {
@@ -889,6 +912,16 @@ contract('LANDAuction', function([
       await landAuction.setDex(0, fromOwner)
       await assertRevert(
         landAuction.bid(xs, ys, bidder, nchToken.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if token is not an allowed token', async function() {
+      const erc20 = await ERC20Token.new(creationParams)
+      await assertRevert(
+        landAuction.bid(xs, ys, bidder, erc20.address, {
           ...fromBidder,
           gasPrice: gasPriceLimit
         })

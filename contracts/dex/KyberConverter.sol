@@ -17,14 +17,6 @@ contract KyberConverter is ITokenConverter {
         kyber = _kyber;
         walletId = _walletId;
     }
- 
-    function getReturn(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
-    external view returns (uint256 amount) 
-    {
-        uint256 rate;
-        (rate, ) = getExpectedRate(_fromToken, _toToken, _fromAmount);
-        amount = _fromAmount.mul(rate).div(10 ** 18);
-    }
     
     function convert(
         IERC20 _fromToken,

@@ -26,7 +26,7 @@ contract KyberMock is IKyberNetwork {
         address /* _walletId */
     ) public payable returns(uint256) {
         uint256 rate;
-        (rate, ) = getExpectedRate(_toToken, _fromToken, _fromAmount);
+        (, rate) = getExpectedRate(_toToken, _fromToken, _fromAmount);
         require(rate > _minConversionRate, "Rate is to low");
         require(_fromToken.transferFrom(msg.sender, this, _fromAmount), "Could not transfer");
         uint256 destAmount = convertRate(_fromAmount, rate);

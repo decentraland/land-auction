@@ -8,16 +8,6 @@ contract ITokenConverter {
     using SafeMath for uint256;
 
     /**
-    * @dev Get a simulation of the total amount of the convertion
-    * @param _fromToken - IERC20 token
-    * @param _toToken - IERC20 token 
-    * @param _fromAmount - uint amount to be converted
-    * @return uin2556 of the amount after convertion
-    */
-    function getReturn(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
-        external view returns (uint256 amount);
-
-    /**
     * @dev Makes a simple ERC20 -> ERC20 token trade
     * @param _fromToken - IERC20 token
     * @param _toToken - IERC20 token 

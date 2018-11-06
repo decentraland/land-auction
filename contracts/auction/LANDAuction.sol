@@ -277,6 +277,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
+    * Note that we will use the slippageRate cause it has a 3% buffer
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return bool to confirm the convertion was successfully
@@ -284,7 +285,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
         uint256 prevBalance = manaToken.balanceOf(address(this));
         uint256 tokenRate;
-        (tokenRate, ) = dex.getExpectedRate(_fromToken, manaToken, _totalPrice);
+        (, tokenRate) = dex.getExpectedRate(_fromToken, manaToken, _totalPrice);
         uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
 
         require(
