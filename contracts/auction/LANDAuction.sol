@@ -30,7 +30,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     {
         require(
             _manaToken.isContract(),
-            "The mana token address must be a deployed contract"
+            "The MANA token address must be a deployed contract"
         );
         manaToken = MANAToken(_manaToken);
 
@@ -39,7 +39,6 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
             "The LANDRegistry token address must be a deployed contract"
         );
         landRegistry = LANDRegistry(_landRegistry);
-
 
         require(_initialPrice > _endPrice, "The start price should be greater than end price");
         require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
@@ -111,7 +110,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         // Transfer MANA to LANDAuction contract
         require(
             manaToken.transferFrom(msg.sender, address(this), totalPrice),
-            "Transfering the totalPrice to LANDAuction contract failed"
+            "Transferring the totalPrice to LANDAuction contract failed"
         );
 
         // Assign LANDs to _beneficiary
@@ -181,7 +180,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         super.pause();
 
         uint256 currentPrice = getCurrentPrice();
-        emit AuctionEnd(msg.sender, currentPrice);
+        emit AuctionEnded(msg.sender, currentPrice, block.timestamp);
     }
 
     /**

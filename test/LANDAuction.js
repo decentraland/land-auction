@@ -449,9 +449,10 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(2)
 
       assertEvent(logs[0], 'Paused')
-      assertEvent(normalizeEvent(logs[1]), 'AuctionEnd', {
+      assertEvent(normalizeEvent(logs[1]), 'AuctionEnded', {
         _caller: owner,
-        _price: getPriceWithLinearFunction(time - initialTime).toString()
+        _price: getPriceWithLinearFunction(time - initialTime).toString(),
+        _time: time.toString()
       })
 
       const status = await landAuction.status()
@@ -476,9 +477,10 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(2)
 
       assertEvent(logs[0], 'Paused')
-      assertEvent(normalizeEvent(logs[1]), 'AuctionEnd', {
+      assertEvent(normalizeEvent(logs[1]), 'AuctionEnded', {
         _caller: owner,
-        _price: getPriceWithLinearFunction(time - initialTime).toString()
+        _price: getPriceWithLinearFunction(time - initialTime).toString(),
+        _time: time.toString()
       })
 
       const status = await landAuction.status()
