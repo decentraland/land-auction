@@ -1,14 +1,13 @@
 pragma solidity ^0.4.24;
 
 import "openzeppelin-eth/contracts/ownership/Ownable.sol";
-import "openzeppelin-eth/contracts/lifecycle/Pausable.sol";
 import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "openzeppelin-eth/contracts/utils/Address.sol";
 
 import "./LANDAuctionStorage.sol";
 
 
-contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
+contract LANDAuction is Ownable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
 
@@ -56,7 +55,6 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         status = Status.created;
 
         Ownable.initialize(msg.sender);
-        Pausable.initialize(msg.sender);
 
         emit AuctionCreated(
             msg.sender,
@@ -75,7 +73,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         uint256 _landsLimitPerBid,
         uint256 _gasPriceLimit
     ) 
-    external onlyOwner whenNotPaused 
+    external onlyOwner 
     {
         require(status == Status.created, "The auction was started");
 
@@ -94,7 +92,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _ys - uint256[] y values for the LANDs to bid
     * @param _beneficiary - address beneficiary for the LANDs to bid
     */
-    function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
+    function bid(int[] _xs, int[] _ys, address _beneficiary) external {
         require(status == Status.started, "The auction was not started");
         require(block.timestamp - startedTime <= duration, "The auction has finished");
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
@@ -166,18 +164,11 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     }
 
     /**
-    * @dev pause auction 
-    */
-    function pause() public onlyOwner whenNotPaused {
-        finishAuction();
-    }
-
-    /**
     * @dev Finish auction 
     */
-    function finishAuction() public onlyOwner whenNotPaused {
+    function finishAuction() public onlyOwner {
+        require(status != Status.finished, "The auction is finished");
         status = Status.finished;
-        super.pause();
 
         uint256 currentPrice = getCurrentPrice();
         emit AuctionEnded(msg.sender, currentPrice, block.timestamp);

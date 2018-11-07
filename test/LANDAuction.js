@@ -441,43 +441,14 @@ contract('LANDAuction', function([
     })
   })
 
-  describe('pause', function() {
-    it('should pause', async function() {
-      const { logs } = await landAuction.pause(fromOwner)
-      const time = getBlockchainTime()
-
-      logs.length.should.be.equal(2)
-
-      assertEvent(logs[0], 'Paused')
-      assertEvent(normalizeEvent(logs[1]), 'AuctionEnded', {
-        _caller: owner,
-        _price: getPriceWithLinearFunction(time - initialTime).toString(),
-        _time: time.toString()
-      })
-
-      const status = await landAuction.status()
-      status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.finished)
-    })
-
-    it('reverts when trying to re-pause', async function() {
-      await landAuction.pause(fromOwner)
-      await assertRevert(landAuction.pause(fromOwner))
-    })
-
-    it('reverts when no-owner trying to pause', async function() {
-      await assertRevert(landAuction.pause(fromHacker))
-    })
-  })
-
   describe('finishAuction', function() {
     it('should finish auction', async function() {
       const { logs } = await landAuction.finishAuction(fromOwner)
       const time = getBlockchainTime()
 
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
 
-      assertEvent(logs[0], 'Paused')
-      assertEvent(normalizeEvent(logs[1]), 'AuctionEnded', {
+      assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
         _caller: owner,
         _price: getPriceWithLinearFunction(time - initialTime).toString(),
         _time: time.toString()

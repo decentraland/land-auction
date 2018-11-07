@@ -137,151 +137,6 @@ contract Ownable is Initializable {
   uint256[50] private ______gap;
 }
 
-// File: openzeppelin-eth/contracts/access/Roles.sol
-
-/**
- * @title Roles
- * @dev Library for managing addresses assigned to a Role.
- */
-library Roles {
-  struct Role {
-    mapping (address => bool) bearer;
-  }
-
-  /**
-   * @dev give an account access to this role
-   */
-  function add(Role storage role, address account) internal {
-    require(account != address(0));
-    role.bearer[account] = true;
-  }
-
-  /**
-   * @dev remove an account's access to this role
-   */
-  function remove(Role storage role, address account) internal {
-    require(account != address(0));
-    role.bearer[account] = false;
-  }
-
-  /**
-   * @dev check if an account has this role
-   * @return bool
-   */
-  function has(Role storage role, address account)
-    internal
-    view
-    returns (bool)
-  {
-    require(account != address(0));
-    return role.bearer[account];
-  }
-}
-
-// File: openzeppelin-eth/contracts/access/roles/PauserRole.sol
-
-contract PauserRole is Initializable {
-  using Roles for Roles.Role;
-
-  event PauserAdded(address indexed account);
-  event PauserRemoved(address indexed account);
-
-  Roles.Role private pausers;
-
-  function initialize(address sender) public initializer {
-    if (!isPauser(sender)) {
-      _addPauser(sender);
-    }
-  }
-
-  modifier onlyPauser() {
-    require(isPauser(msg.sender));
-    _;
-  }
-
-  function isPauser(address account) public view returns (bool) {
-    return pausers.has(account);
-  }
-
-  function addPauser(address account) public onlyPauser {
-    _addPauser(account);
-  }
-
-  function renouncePauser() public {
-    _removePauser(msg.sender);
-  }
-
-  function _addPauser(address account) internal {
-    pausers.add(account);
-    emit PauserAdded(account);
-  }
-
-  function _removePauser(address account) internal {
-    pausers.remove(account);
-    emit PauserRemoved(account);
-  }
-
-  uint256[50] private ______gap;
-}
-
-// File: openzeppelin-eth/contracts/lifecycle/Pausable.sol
-
-/**
- * @title Pausable
- * @dev Base contract which allows children to implement an emergency stop mechanism.
- */
-contract Pausable is Initializable, PauserRole {
-  event Paused();
-  event Unpaused();
-
-  bool private _paused = false;
-
-  function initialize(address sender) public initializer {
-    PauserRole.initialize(sender);
-  }
-
-  /**
-   * @return true if the contract is paused, false otherwise.
-   */
-  function paused() public view returns(bool) {
-    return _paused;
-  }
-
-  /**
-   * @dev Modifier to make a function callable only when the contract is not paused.
-   */
-  modifier whenNotPaused() {
-    require(!_paused);
-    _;
-  }
-
-  /**
-   * @dev Modifier to make a function callable only when the contract is paused.
-   */
-  modifier whenPaused() {
-    require(_paused);
-    _;
-  }
-
-  /**
-   * @dev called by the owner to pause, triggers stopped state
-   */
-  function pause() public onlyPauser whenNotPaused {
-    _paused = true;
-    emit Paused();
-  }
-
-  /**
-   * @dev called by the owner to unpause, returns to normal state
-   */
-  function unpause() public onlyPauser whenPaused {
-    _paused = false;
-    emit Unpaused();
-  }
-
-  uint256[50] private ______gap;
-}
-
 // File: openzeppelin-eth/contracts/math/SafeMath.sol
 
 /**
@@ -454,7 +309,7 @@ contract LANDAuctionStorage {
 
 // File: contracts/auction/LANDAuction.sol
 
-contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
+contract LANDAuction is Ownable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
 
@@ -502,7 +357,6 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         status = Status.created;
 
         Ownable.initialize(msg.sender);
-        Pausable.initialize(msg.sender);
 
         emit AuctionCreated(
             msg.sender,
@@ -521,7 +375,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
         uint256 _landsLimitPerBid,
         uint256 _gasPriceLimit
     ) 
-    external onlyOwner whenNotPaused 
+    external onlyOwner 
     {
         require(status == Status.created, "The auction was started");
 
@@ -540,7 +394,7 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     * @param _ys - uint256[] y values for the LANDs to bid
     * @param _beneficiary - address beneficiary for the LANDs to bid
     */
-    function bid(int[] _xs, int[] _ys, address _beneficiary) external whenNotPaused {
+    function bid(int[] _xs, int[] _ys, address _beneficiary) external {
         require(status == Status.started, "The auction was not started");
         require(block.timestamp - startedTime <= duration, "The auction has finished");
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
@@ -612,18 +466,11 @@ contract LANDAuction is Ownable, Pausable, LANDAuctionStorage {
     }
 
     /**
-    * @dev pause auction 
-    */
-    function pause() public onlyOwner whenNotPaused {
-        finishAuction();
-    }
-
-    /**
     * @dev Finish auction 
     */
-    function finishAuction() public onlyOwner whenNotPaused {
+    function finishAuction() public onlyOwner {
+        require(status != Status.finished, "The auction is finished");
         status = Status.finished;
-        super.pause();
 
         uint256 currentPrice = getCurrentPrice();
         emit AuctionEnded(msg.sender, currentPrice, block.timestamp);
