@@ -31,7 +31,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         address[] _allowedTokens
     ) public {
         Ownable.initialize(msg.sender);
-        Pausable.initialize(msg.sender);
 
         require(
             address(_landRegistry).isContract(),
@@ -126,7 +125,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         int[] _ys, 
         address _beneficiary, 
         ERC20 _fromToken
-    ) external whenNotPaused 
+    ) external 
     {
         require(status == Status.started, "The auction was not started");
         require(block.timestamp - startedTime <= duration, "The auction has finished");
