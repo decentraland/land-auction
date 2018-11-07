@@ -139,7 +139,7 @@ contract('LANDAuction', function([
   }
 
   async function getBidTotal(xs, ys, bidder) {
-    const { logs } = await landAuction.bid(xs, ys, bidder, {
+    const { logs } = await landAuction.bid(xs, ys, bidder, manaToken.address, {
       ...{ from: bidder },
       gasPrice: gasPriceLimit
     })
@@ -806,7 +806,7 @@ contract('LANDAuction', function([
       )
 
       await assertRevert(
-        landAuction.bid([1], [1], anotherBidder, {
+        landAuction.bid([1], [1], anotherBidder, manaToken.address, {
           ...fromAnotherBidder,
           gasPrice: gasPriceLimit
         })
