@@ -714,7 +714,7 @@ contract('LANDAuction', function([
       await increaseTime(duration.days(3))
       await landAuction.bid(xs, ys, bidder, {
         ...fromBidder,
-        gasPrice: gasPriceLimit - 1
+        gasPrice: gasPriceLimit
       })
       const price = await getCurrentPrice()
       await landAuction.finishAuction(fromOwner)
@@ -731,6 +731,16 @@ contract('LANDAuction', function([
         },
         true
       )
+    })
+
+    it('should execute burnFunds called by another user ', async function() {
+      await increaseTime(duration.days(3))
+      await landAuction.bid(xs, ys, bidder, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+      await landAuction.finishAuction(fromOwner)
+      await landAuction.burnFunds(fromHacker)
     })
 
     it('reverts when trying to burn 0 funds', async function() {
