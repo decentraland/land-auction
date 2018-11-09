@@ -171,7 +171,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         status = Status.finished;
 
         uint256 currentPrice = getCurrentPrice();
-        emit AuctionEnded(msg.sender, currentPrice, block.timestamp);
+        emit AuctionEnded(msg.sender, block.timestamp, currentPrice);
     }
 
     /**

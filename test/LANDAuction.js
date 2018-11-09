@@ -104,25 +104,11 @@ contract('LANDAuction', function([
   let manaToken
   let landRegistry
 
-  const fromOwner = {
-    from: owner
-  }
-
-  const fromBidder = {
-    from: bidder
-  }
-
-  const fromAnotherBidder = {
-    from: anotherBidder
-  }
-
-  const fromBidderWithoutFunds = {
-    from: bidderWithoutFunds
-  }
-
-  const fromHacker = {
-    from: hacker
-  }
+  const fromOwner = { from: owner }
+  const fromBidder = { from: bidder }
+  const fromAnotherBidder = { from: anotherBidder }
+  const fromBidderWithoutFunds = { from: bidderWithoutFunds }
+  const fromHacker = { from: hacker }
 
   const creationParams = {
     ...fromOwner,
@@ -144,6 +130,14 @@ contract('LANDAuction', function([
   const getCurrentPrice = async () => {
     const price = await landAuction.getCurrentPrice()
     return weiToDecimal(price.toNumber())
+  }
+
+  async function getBidTotal(xs, ys, bidder) {
+    const { logs } = await landAuction.bid(xs, ys, bidder, {
+      ...{ from: bidder },
+      gasPrice: gasPriceLimit
+    })
+    return logs[0].args._totalPrice
   }
 
   beforeEach(async function() {
@@ -181,7 +175,7 @@ contract('LANDAuction', function([
   })
 
   describe('constructor', function() {
-    it('should instanciate with correct values', async function() {
+    it('should create with correct values', async function() {
       const _landAuction = await LANDAuction.new(
         initialPrice,
         endPrice,
@@ -207,7 +201,7 @@ contract('LANDAuction', function([
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.created)
     })
 
-    it('revert if instanciate with incorrect values :: initialPrice = 0', async function() {
+    it('reverts if create with incorrect values :: initialPrice = 0', async function() {
       await assertRevert(
         LANDAuction.new(
           0,
@@ -220,7 +214,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: initialPrice < endPrice', async function() {
+    it('reverts if create with incorrect values :: initialPrice < endPrice', async function() {
       await assertRevert(
         LANDAuction.new(
           endPrice - 1,
@@ -233,7 +227,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: duration < 1 day', async function() {
+    it('reverts if create with incorrect values :: duration < 1 day', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -246,7 +240,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: manaToken not a valid address', async function() {
+    it('reverts if create with incorrect values :: manaToken not a valid contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -268,12 +262,10 @@ contract('LANDAuction', function([
           fromOwner
         )
       )
-    })
 
-    it('revert if instanciate with incorrect values :: manaToken not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
-          endPrice - 1,
+          initialPrice,
           endPrice,
           auctionDuration,
           owner,
@@ -283,7 +275,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('revert if instanciate with incorrect values :: landRegistry not a valid address', async function() {
+    it('reverts if create with incorrect values :: landRegistry not a valid contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -305,9 +297,7 @@ contract('LANDAuction', function([
           fromOwner
         )
       )
-    })
 
-    it('revert if instanciate with incorrect values :: landRegistry not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           endPrice - 1,
@@ -385,14 +375,12 @@ contract('LANDAuction', function([
     })
 
     it('reverts when landLimit = 0', async function() {
-      await assertRevert(
-        _landAuction.startAuction(0, gasPriceLimit, fromHacker)
-      )
+      await assertRevert(_landAuction.startAuction(0, gasPriceLimit, fromOwner))
     })
 
     it('reverts when gasPriceLimit = 0', async function() {
       await assertRevert(
-        _landAuction.startAuction(landsLimitPerBid, 0, fromHacker)
+        _landAuction.startAuction(landsLimitPerBid, 0, fromOwner)
       )
     })
   })
@@ -408,11 +396,11 @@ contract('LANDAuction', function([
       _landLimit.should.be.bignumber.equal(40)
     })
 
-    it('revert when changing to 0', async function() {
+    it('reverts when changing to 0', async function() {
       await assertRevert(landAuction.setLandsLimitPerBid(0, fromOwner))
     })
 
-    it('revert when no-owner try to change it', async function() {
+    it('reverts when no-owner try to change it', async function() {
       await assertRevert(
         landAuction.setLandsLimitPerBid(landsLimitPerBid, fromHacker)
       )
@@ -421,20 +409,21 @@ contract('LANDAuction', function([
 
   describe('setGasPriceLimit', function() {
     it('should change gas price limit', async function() {
+      const newGasPriceLimit = 8
       let _gasPriceLimit = await landAuction.gasPriceLimit()
       _gasPriceLimit.should.be.bignumber.equal(gasPriceLimit)
 
-      await landAuction.setGasPriceLimit(8, fromOwner)
+      await landAuction.setGasPriceLimit(newGasPriceLimit, fromOwner)
 
       _gasPriceLimit = await landAuction.gasPriceLimit()
-      _gasPriceLimit.should.be.bignumber.equal(8)
+      _gasPriceLimit.should.be.bignumber.equal(newGasPriceLimit)
     })
 
-    it('revert when changing to 0', async function() {
+    it('reverts when changing to 0', async function() {
       await assertRevert(landAuction.setGasPriceLimit(0, fromOwner))
     })
 
-    it('revert when no-owner try to change it', async function() {
+    it('reverts when no-owner try to change it', async function() {
       await assertRevert(
         landAuction.setGasPriceLimit(gasPriceLimit, fromHacker)
       )
@@ -450,8 +439,8 @@ contract('LANDAuction', function([
 
       assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
         _caller: owner,
-        _price: getPriceWithLinearFunction(time - initialTime).toString(),
-        _time: time.toString()
+        _time: time.toString(),
+        _price: getPriceWithLinearFunction(time - initialTime).toString()
       })
 
       const status = await landAuction.status()
@@ -550,28 +539,13 @@ contract('LANDAuction', function([
 
     it('should increase balance of LANDAuction contract', async function() {
       let total = 0
-      const logs1 = await landAuction.bid(xs, ys, bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-      let log = logs1.logs[0]
-      total = log.args._totalPrice.plus(total)
+      total = (await getBidTotal(xs, ys, bidder)).plus(total)
 
       await increaseTime(duration.hours(5))
-      const logs2 = await landAuction.bid([5], [5], anotherBidder, {
-        ...fromAnotherBidder,
-        gasPrice: gasPriceLimit
-      })
-      log = logs2.logs[0]
-      total = log.args._totalPrice.plus(total)
+      total = (await getBidTotal([5], [5], anotherBidder)).plus(total)
 
       await increaseTime(duration.days(3))
-      const log3 = await landAuction.bid([6], [6], bidder, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-      log = log3.logs[0]
-      total = log.args._totalPrice.plus(total)
+      total = (await getBidTotal([6], [6], bidder)).plus(total)
 
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(total)
@@ -623,18 +597,25 @@ contract('LANDAuction', function([
           gasPrice: gasPriceLimit
         })
       )
+
+      await assertRevert(
+        landAuction.bid([1], [1], anotherBidder, {
+          ...fromAnotherBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
     })
 
     it('reverts if bidder has insufficient funds', async function() {
       await assertRevert(
-        landAuction.bid(xs, ys, bidder, {
+        landAuction.bid(xs, ys, bidderWithoutFunds, {
           ...fromBidderWithoutFunds,
           gasPrice: gasPriceLimit
         })
       )
     })
 
-    it('reverts if bidder has not approve MANA', async function() {
+    it('reverts if bidder has not approved MANA', async function() {
       await manaToken.approve(
         landAuction.address,
         web3.toWei(0.1, 'ether'),
@@ -663,7 +644,7 @@ contract('LANDAuction', function([
       await assertRevert(
         landAuction.bid([], [], bidder, {
           ...fromBidder,
-          gasPrice: gasPriceLimit + 1
+          gasPrice: gasPriceLimit
         })
       )
     })
@@ -672,7 +653,7 @@ contract('LANDAuction', function([
       await assertRevert(
         landAuction.bid([1, 2], [3], bidder, {
           ...fromBidder,
-          gasPrice: gasPriceLimit + 1
+          gasPrice: gasPriceLimit
         })
       )
     })
@@ -721,7 +702,7 @@ contract('LANDAuction', function([
       await increaseTime(duration.seconds(1))
       await assertRevert(
         landAuction.bid([1], [1], bidder, {
-          ...fromAnotherBidder,
+          ...fromBidder,
           gasPrice: gasPriceLimit
         })
       )

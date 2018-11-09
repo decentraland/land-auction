@@ -55,8 +55,8 @@ contract LANDAuctionStorage {
 
     event AuctionEnded(
       address indexed _caller,
-      uint256 _price,
-      uint256 _time
+      uint256 _time,
+      uint256 _price
     );
 
     event MANABurned(
