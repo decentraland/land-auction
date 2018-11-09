@@ -19,7 +19,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
-    * @param _allowedTokens - array of ERC20 addresses allowed to bid
     */
     constructor(
         uint256 _initialPrice, 
@@ -27,8 +26,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 _duration, 
         ERC20 _manaToken, 
         LANDRegistry _landRegistry,
-        address _dex,
-        address[] _allowedTokens
+        address _dex
     ) public {
         Ownable.initialize(msg.sender);
 
@@ -42,14 +40,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             setDex(_dex);
         }
 
-        allowToken(address(_manaToken));
+        allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
-
-        for (uint i = 0; i < _allowedTokens.length; i++) {
-            address allowedToken = _allowedTokens[i];            
-            allowToken(allowedToken);
-        }
-
 
         require(_initialPrice > _endPrice, "The start price should be greater than end price");
         require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
@@ -134,7 +126,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_xs.length > 0, "You should bid to at least one LAND");
         require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
         require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)], "token not accepted");
+        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
 
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -174,6 +166,28 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _xs,
             _ys
         );
+    }
+
+    /**
+    * @dev Allow many ERC20 tokens to to be used for bidding
+    * @param _address - array of addresses of the ERC20 Token
+    * @param _decimals - array of uint256 of the number of decimals
+    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
+    */
+    function allowManyTokens(
+        address[] _address, 
+        uint256[] _decimals, 
+        bool[] _shouldKeepToken
+    ) external onlyOwner
+    {
+        require(
+            _address.length == _decimals.length && _decimals.length == _shouldKeepToken.length,
+            "The length of _addresses, decimals and _shouldKeepToken should be the same"
+        );
+
+        for (uint i = 0; i < _address.length; i++) {
+            allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
+        }
     }
 
     /**
@@ -236,15 +250,37 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Allow ERC20 to to be used for bidding
     * @param _address - address of the ERC20 Token
+    * @param _decimals - uint256 of the number of decimals
+    * @param _shouldKeepToken - boolean whether we should keep the token or not
     */
-    function allowToken(address _address) public onlyOwner {
+    function allowToken(
+        address _address, 
+        uint256 _decimals, 
+        bool _shouldKeepToken) 
+    public onlyOwner 
+    {
         require(
             _address.isContract(),
             "Tokens allowed should be a deployed ERC20 contract"
         );
-        require(!tokensAllowed[_address], "The ERC20 token is already allowed");
-        tokensAllowed[_address] = true;
-        emit TokenAllowed(msg.sender, _address);
+        require(
+            _decimals > 0 && _decimals <= 18,
+            "Decimals should be greather than 0 and less or equal to 18"
+        );
+        require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
+
+        tokensAllowed[_address] = tokenAllowed({
+            decimals: _decimals,
+            shouldKeepToken: _shouldKeepToken,
+            isAllowed: true
+        });
+
+        emit TokenAllowed(
+            msg.sender, 
+            _address, 
+            _decimals, 
+            _shouldKeepToken
+        );
     }
 
     /**
@@ -252,8 +288,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _address - address of the ERC20 Token
     */
     function disableToken(address _address) public onlyOwner {
-        require(tokensAllowed[_address], "The ERC20 token is already disabled");
-        tokensAllowed[_address] = false;
+        require(
+            tokensAllowed[_address].isAllowed,
+            "The ERC20 token is already disabled"
+        );
+        delete tokensAllowed[_address];
         emit TokenDisabled(msg.sender, _address);
     }
 
@@ -283,9 +322,16 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
         uint256 prevBalance = manaToken.balanceOf(address(this));
+
         uint256 tokenRate;
         (, tokenRate) = dex.getExpectedRate(_fromToken, manaToken, _totalPrice);
-        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
+
+        // Normalize to 18 decimals and calculate the amount of tokens to convert 
+        uint256 totalPriceInToken = _totalPrice.mul(
+                10 ** MAX_DECIMALS.sub(tokensAllowed[address(_fromToken)].decimals)
+            )
+            .mul(tokenRate)
+            .div(10 ** 18);
 
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
@@ -294,19 +340,21 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
+        // Convert token to MANA
         uint256 bought = dex.convert(
                 _fromToken,
                 manaToken,
                 totalPriceInToken,
                 1
             );
+
         require(
             manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
             "Bought amount incorrect"
         );
 
         if (bought > _totalPrice) {
-            // return mana to sender
+            // Return change in MANA to sender
             uint256 change = bought.sub(_totalPrice);
             require(
                 manaToken.transfer(msg.sender, change),
