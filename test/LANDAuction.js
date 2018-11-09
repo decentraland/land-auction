@@ -962,7 +962,7 @@ contract('LANDAuction', function([
 
     it('should execute burnFunds called by another user ', async function() {
       await increaseTime(duration.days(3))
-      await landAuction.bid(xs, ys, bidder, {
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
@@ -1081,5 +1081,4 @@ contract('LANDAuction', function([
     })
   })
   //@nacho TODO: add token bidded with real check of reserves
-  //@nacho TODO: change to swapTokenToToken
 })
