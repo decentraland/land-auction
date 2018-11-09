@@ -21,7 +21,16 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
+    uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
+    uint256 constant public MAX_DECIMALS = 18;
+
     enum Status { created, started, finished }
+
+    struct tokenAllowed {
+        uint256 decimals;
+        bool shouldKeepToken;
+        bool isAllowed;
+    }
 
     Status public status;
     uint256 public gasPriceLimit;
@@ -29,7 +38,7 @@ contract LANDAuctionStorage {
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
-    mapping (address => bool) public tokensAllowed;
+    mapping (address => tokenAllowed) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -88,7 +97,9 @@ contract LANDAuctionStorage {
 
     event TokenAllowed(
       address indexed _caller,
-      address indexed _address
+      address indexed _address,
+      uint256 _decimals,
+      bool _shouldKeepToken
     );
 
     event TokenDisabled(

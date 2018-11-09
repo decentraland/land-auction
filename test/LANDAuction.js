@@ -19,6 +19,9 @@ const AUCTION_STATUS_OP_CODES = {
   finished: 2
 }
 
+const MAX_DECIMALS = 18
+const SPECIAL_DECIMALS = 12
+
 function getBlockchainTime(blockNumber = 'latest') {
   return web3.eth.getBlock(blockNumber).timestamp
 }
@@ -168,7 +171,6 @@ contract('LANDAuction', function([
       manaToken.address,
       landRegistry.address,
       kyberConverter.address,
-      [nchToken.address, dclToken.address],
       fromOwner
     )
     // Start auction
@@ -225,7 +227,6 @@ contract('LANDAuction', function([
         manaToken.address,
         landRegistry.address,
         kyberConverter.address,
-        [],
         fromOwner
       )
 
@@ -259,8 +260,7 @@ contract('LANDAuction', function([
         auctionDuration,
         manaToken.address,
         landRegistry.address,
-        0,
-        [],
+        kyberConverter.address,
         fromOwner
       )
     })
@@ -273,7 +273,6 @@ contract('LANDAuction', function([
         manaToken.address,
         landRegistry.address,
         kyberConverter.address,
-        [nchToken.address, dclToken.address],
         fromOwner
       )
     })
@@ -287,7 +286,6 @@ contract('LANDAuction', function([
           manaToken.address,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -302,7 +300,6 @@ contract('LANDAuction', function([
           manaToken.address,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -317,7 +314,6 @@ contract('LANDAuction', function([
           manaToken.address,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -332,7 +328,6 @@ contract('LANDAuction', function([
           zeroAddress,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -345,7 +340,6 @@ contract('LANDAuction', function([
           0,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -358,7 +352,6 @@ contract('LANDAuction', function([
           owner,
           landRegistry.address,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -373,7 +366,6 @@ contract('LANDAuction', function([
           manaToken.address,
           zeroAddress,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -386,7 +378,6 @@ contract('LANDAuction', function([
           manaToken.address,
           0,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -399,7 +390,6 @@ contract('LANDAuction', function([
           manaToken.address,
           owner,
           kyberConverter.address,
-          [],
           fromOwner
         )
       )
@@ -414,22 +404,6 @@ contract('LANDAuction', function([
           manaToken.address,
           landRegistry.address,
           bidder,
-          [],
-          fromOwner
-        )
-      )
-    })
-
-    it('reverts if instanciate with incorrect values :: AllowedTokens not a contract address', async function() {
-      await assertRevert(
-        LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
-          manaToken.address,
-          landRegistry.address,
-          kyberConverter.address,
-          [bidder],
           fromOwner
         )
       )
@@ -446,7 +420,6 @@ contract('LANDAuction', function([
         manaToken.address,
         landRegistry.address,
         kyberConverter.address,
-        [],
         fromOwner
       )
     })
@@ -736,6 +709,14 @@ contract('LANDAuction', function([
     })
 
     it('should bid with other tokens', async function() {
+      // Allow token
+      await landAuction.allowManyTokens(
+        [nchToken.address],
+        [MAX_DECIMALS],
+        [false],
+        fromOwner
+      )
+
       // Get prev balance of bidder of NCH token
       const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
 
@@ -771,6 +752,58 @@ contract('LANDAuction', function([
         const address = await landRegistry.ownerOf(id)
         address.should.be.equal(bidder)
       }
+
+      // Check balance of LAND Auction contract
+      const balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+
+      // Check reserve of kyber and balance of bidder
+      const kyberNCHBalance = await nchToken.balanceOf(kyberMock.address)
+      const bidderNCHBalance = await nchToken.balanceOf(bidder)
+      kyberNCHBalance.should.be.bignumber.gt(0)
+      kyberNCHBalance.should.be.bignumber.equal(
+        bidderNCHPrevBalance.minus(bidderNCHBalance)
+      )
+    })
+
+    //@nacho TODO: add a token with 12 decimals (maybe change DCL)
+    it.skip(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
+      // Allow token
+      await landAuction.allowManyTokens(
+        [nchToken.address],
+        [SPECIAL_DECIMALS],
+        [false],
+        fromOwner
+      )
+
+      // Get prev balance of bidder of NCH token
+      const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
+
+      // Bid
+      const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      // Check Log
+      const time = getBlockchainTime(logs[0].blockNumber)
+      const price = getPriceWithLinearFunction(time - initialTime)
+
+      logs.length.should.be.equal(1)
+
+      assertEvent(
+        normalizeEvent(logs[0]),
+        'BidSuccessful',
+        {
+          _beneficiary: bidder,
+          _token: nchToken.address,
+          _price: price.toString(),
+          _totalPrice: (price * xs.length).toString(),
+          _xs: xs,
+          _ys: ys
+        },
+        true
+      )
 
       // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
@@ -1007,36 +1040,163 @@ contract('LANDAuction', function([
     })
   })
 
+  describe('allowManyTokens', function() {
+    it('should allowManyTokens', async function() {
+      const erc20 = await ERC20Token.new(creationParams)
+
+      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(false)
+
+      isAllowed = (await landAuction.tokensAllowed(nchToken.address))[2]
+      isAllowed.should.be.equal(false)
+
+      isAllowed = (await landAuction.tokensAllowed(dclToken.address))[2]
+      isAllowed.should.be.equal(false)
+
+      const { logs } = await landAuction.allowManyTokens(
+        [nchToken.address, dclToken.address, erc20.address],
+        [MAX_DECIMALS, MAX_DECIMALS, SPECIAL_DECIMALS],
+        [false, true, false],
+        fromOwner
+      )
+
+      assertEvent(logs[0], 'TokenAllowed', {
+        _caller: owner,
+        _address: nchToken.address,
+        _decimals: MAX_DECIMALS.toString(),
+        _shouldKeepToken: false
+      })
+
+      assertEvent(logs[1], 'TokenAllowed', {
+        _caller: owner,
+        _address: dclToken.address,
+        _decimals: MAX_DECIMALS.toString(),
+        _shouldKeepToken: true
+      })
+
+      assertEvent(logs[2], 'TokenAllowed', {
+        _caller: owner,
+        _address: erc20.address,
+        _decimals: SPECIAL_DECIMALS.toString(),
+        _shouldKeepToken: false
+      })
+
+      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(true)
+
+      isAllowed = (await landAuction.tokensAllowed(nchToken.address))[2]
+      isAllowed.should.be.equal(true)
+
+      isAllowed = (await landAuction.tokensAllowed(dclToken.address))[2]
+      isAllowed.should.be.equal(true)
+    })
+
+    it('reverts when allow tokens with invalid parameteres:: not the same length', async function() {
+      await assertRevert(
+        landAuction.allowManyTokens(
+          [nchToken.address],
+          [MAX_DECIMALS, SPECIAL_DECIMALS],
+          [false],
+          fromOwner
+        )
+      )
+
+      await assertRevert(
+        landAuction.allowManyTokens(
+          [nchToken.address],
+          [MAX_DECIMALS],
+          [false, true],
+          fromOwner
+        )
+      )
+
+      await assertRevert(
+        landAuction.allowManyTokens(
+          [nchToken.address, dclToken.address],
+          [MAX_DECIMALS],
+          [false],
+          fromOwner
+        )
+      )
+    })
+
+    it('reverts when no-owner try to change it', async function() {
+      await assertRevert(
+        landAuction.allowManyTokens(
+          [nchToken.address],
+          [MAX_DECIMALS],
+          [false],
+          fromHacker
+        )
+      )
+    })
+  })
+
   describe('allowToken', function() {
     it('should allowToken', async function() {
       const erc20 = await ERC20Token.new(creationParams)
 
-      let res = await landAuction.tokensAllowed(erc20.address)
-      res.should.be.equal(false)
+      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(false)
 
-      const { logs } = await landAuction.allowToken(erc20.address, fromOwner)
+      const { logs } = await landAuction.allowToken(
+        erc20.address,
+        MAX_DECIMALS,
+        false,
+        fromOwner
+      )
 
       assertEvent(logs[0], 'TokenAllowed', {
         _caller: owner,
-        _address: erc20.address
+        _address: erc20.address,
+        _decimals: MAX_DECIMALS.toString(),
+        _shouldKeepToken: false
       })
 
-      res = await landAuction.tokensAllowed(erc20.address)
-      res.should.be.equal(true)
+      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(true)
     })
 
     it('reverts when allow a token already allowed', async function() {
-      await assertRevert(landAuction.allowToken(manaToken.address, fromOwner))
+      await assertRevert(
+        landAuction.allowToken(
+          manaToken.address,
+          MAX_DECIMALS,
+          false,
+          fromOwner
+        )
+      )
     })
 
     it('reverts when trying to allow not a contract', async function() {
-      await assertRevert(landAuction.allowToken(bidder, fromOwner))
-      await assertRevert(landAuction.allowToken(0, fromOwner))
+      await assertRevert(
+        landAuction.allowToken(bidder, MAX_DECIMALS, false, fromOwner)
+      )
+      await assertRevert(
+        landAuction.allowToken(0, MAX_DECIMALS, false, fromOwner)
+      )
+    })
+
+    it('reverts when trying to allow a token with invalid decimals', async function() {
+      await assertRevert(
+        landAuction.allowToken(nchToken.address, 0, false, fromOwner)
+      )
+
+      await assertRevert(
+        landAuction.allowToken(
+          nchToken.address,
+          MAX_DECIMALS + 1,
+          false,
+          fromOwner
+        )
+      )
     })
 
     it('reverts when no-owner try to change it', async function() {
       const erc20 = await ERC20Token.new(creationParams)
-      await assertRevert(landAuction.allowToken(erc20.address, fromHacker))
+      await assertRevert(
+        landAuction.allowToken(erc20.address, MAX_DECIMALS, false, fromHacker)
+      )
     })
   })
 
@@ -1044,9 +1204,14 @@ contract('LANDAuction', function([
     it('should disableToken', async function() {
       const erc20 = await ERC20Token.new(creationParams)
 
-      await landAuction.allowToken(erc20.address, fromOwner)
-      let res = await landAuction.tokensAllowed(erc20.address)
-      res.should.be.equal(true)
+      await landAuction.allowToken(
+        erc20.address,
+        MAX_DECIMALS,
+        false,
+        fromOwner
+      )
+      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(true)
 
       const { logs } = await landAuction.disableToken(erc20.address, fromOwner)
 
@@ -1055,8 +1220,8 @@ contract('LANDAuction', function([
         _address: erc20.address
       })
 
-      res = await landAuction.tokensAllowed(erc20.address)
-      res.should.be.equal(false)
+      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed.should.be.equal(false)
     })
 
     it('reverts when allow a token already allowed', async function() {
@@ -1073,5 +1238,4 @@ contract('LANDAuction', function([
       )
     })
   })
-  //@nacho TODO: add token bidded with real check of reserves
 })
