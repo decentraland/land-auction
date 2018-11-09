@@ -201,7 +201,7 @@ contract('LANDAuction', function([
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.created)
     })
 
-    it('reverts if create with incorrect values :: initialPrice = 0', async function() {
+    it('reverts if creator creates with incorrect values :: initialPrice = 0', async function() {
       await assertRevert(
         LANDAuction.new(
           0,
@@ -214,7 +214,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if create with incorrect values :: initialPrice < endPrice', async function() {
+    it('reverts if creator creates with incorrect values :: initialPrice < endPrice', async function() {
       await assertRevert(
         LANDAuction.new(
           endPrice - 1,
@@ -227,7 +227,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if create with incorrect values :: duration < 1 day', async function() {
+    it('reverts if creator creates with incorrect values :: duration < 1 day', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -240,7 +240,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if create with incorrect values :: manaToken not a valid contract address', async function() {
+    it('reverts if creator creates with incorrect values :: manaToken not a valid contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -275,7 +275,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if create with incorrect values :: landRegistry not a valid contract address', async function() {
+    it('reverts if creator creates with incorrect values :: landRegistry not a valid contract address', async function() {
       await assertRevert(
         LANDAuction.new(
           initialPrice,
@@ -400,7 +400,7 @@ contract('LANDAuction', function([
       await assertRevert(landAuction.setLandsLimitPerBid(0, fromOwner))
     })
 
-    it('reverts when no-owner try to change it', async function() {
+    it('reverts when no-owner trying to change it', async function() {
       await assertRevert(
         landAuction.setLandsLimitPerBid(landsLimitPerBid, fromHacker)
       )
@@ -423,7 +423,7 @@ contract('LANDAuction', function([
       await assertRevert(landAuction.setGasPriceLimit(0, fromOwner))
     })
 
-    it('reverts when no-owner try to change it', async function() {
+    it('reverts when no-owner trying to change it', async function() {
       await assertRevert(
         landAuction.setGasPriceLimit(gasPriceLimit, fromHacker)
       )
@@ -452,7 +452,7 @@ contract('LANDAuction', function([
       await assertRevert(landAuction.finishAuction(fromOwner))
     })
 
-    it('reverts when no-owner trying to finish auction', async function() {
+    it('reverts when no-owner finishing auction', async function() {
       await assertRevert(landAuction.finishAuction(fromHacker))
     })
   })
@@ -585,7 +585,7 @@ contract('LANDAuction', function([
       })
     })
 
-    it('reverts if try to bid assigned LANDs', async function() {
+    it('reverts if user bids assigned LANDs', async function() {
       await landAuction.bid(xs, ys, bidder, {
         ...fromBidder,
         gasPrice: gasPriceLimit
@@ -640,7 +640,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if bid for empty LAND', async function() {
+    it('reverts if user bids for empty LAND', async function() {
       await assertRevert(
         landAuction.bid([], [], bidder, {
           ...fromBidder,
@@ -649,7 +649,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if bid for invalid coordinates', async function() {
+    it('reverts if user bids for invalid coordinates', async function() {
       await assertRevert(
         landAuction.bid([1, 2], [3], bidder, {
           ...fromBidder,
@@ -658,7 +658,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if exceed gas price limit', async function() {
+    it('reverts if transaction exceeds gas price limit', async function() {
       await assertRevert(
         landAuction.bid(xs, ys, bidder, {
           ...fromBidder,
@@ -667,7 +667,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if try to bid out of boundaries LANDs', async function() {
+    it('reverts if user bids out of boundaries LANDs', async function() {
       assertRevert(
         landAuction.bid([-151], [150], bidder, {
           ...fromBidder,
@@ -697,7 +697,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if try to bid when now - initialTime > duration ', async function() {
+    it('reverts if user bids when now - initialTime > duration ', async function() {
       await increaseTime(auctionDuration)
       await increaseTime(duration.seconds(1))
       await assertRevert(
