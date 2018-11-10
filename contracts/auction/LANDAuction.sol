@@ -324,14 +324,18 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 prevBalance = manaToken.balanceOf(address(this));
 
         uint256 tokenRate;
-        (, tokenRate) = dex.getExpectedRate(_fromToken, manaToken, _totalPrice);
+        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, _totalPrice);
 
-        // Normalize to 18 decimals and calculate the amount of tokens to convert 
-        uint256 totalPriceInToken = _totalPrice.mul(
-                10 ** MAX_DECIMALS.sub(tokensAllowed[address(_fromToken)].decimals)
-            )
-            .mul(tokenRate)
-            .div(10 ** 18);
+        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
+
+        uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
+        // Normalize to _fromToken decimals and calculate the amount of tokens to convert
+        if (MAX_DECIMALS > fromTokenDecimals)  {
+             // Ceil the result of the normalization always fue to convertions fee
+            totalPriceInToken = totalPriceInToken
+            .div(10**(MAX_DECIMALS - fromTokenDecimals))
+            .add(1);
+        }
 
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
@@ -345,9 +349,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 _fromToken,
                 manaToken,
                 totalPriceInToken,
-                1
+                _totalPrice
             );
-
+        
         require(
             manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
             "Bought amount incorrect"
