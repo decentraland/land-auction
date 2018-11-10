@@ -19,49 +19,54 @@ contract KyberConverter is ITokenConverter {
     }
     
     function convert(
-        IERC20 _fromToken,
-        IERC20 _toToken,
-        uint256 _fromAmount,
-        uint256 _minReturn) 
+        IERC20 _srcToken,
+        IERC20 _destToken,
+        uint256 _srcAmount,
+        uint256 _minReturn
+    ) 
     external payable returns (uint256 amount) 
     {
         // Transfer tokens to be converted from msg.sender to this contract
         require(
-            _fromToken.transferFrom(msg.sender, address(this), _fromAmount),
-            "Could not transfer _fromToken to this contract"
+            _srcToken.transferFrom(msg.sender, address(this), _srcAmount),
+            "Could not transfer _srcToken to this contract"
         );
-        // Approve Kyber to use _fromToken on belhalf of this contract
+        // Approve Kyber to use _srcToken on belhalf of this contract
         require(
-            _fromToken.approve(kyber, _fromAmount),
-            "Could not approve kyber to use _fromToken on behalf of this contract"
+            _srcToken.approve(kyber, _srcAmount),
+            "Could not approve kyber to use _srcToken on behalf of this contract"
         );
-        // Trade _fromAmount from _fromToken to _toToken
+
+        uint256 minRate;
+        (, minRate) = getExpectedRate(_srcToken, _destToken, _minReturn);
+
+        // Trade _srcAmount from _srcToken to _destToken
         amount = kyber.trade(
-            _fromToken,
-            _fromAmount,
-            _toToken,
+            _srcToken,
+            _srcAmount,
+            _destToken,
             address(this),
             MAX_UINT,
-            _minReturn,
+            minRate,
             walletId
         );
-        // Clean kyber to use _fromTokens on belhalf of this contract
+        // Clean kyber to use _srcTokens on belhalf of this contract
         require(
-            _fromToken.approve(kyber, 0),
-            "Could not clean approval of kyber to use _fromToken on behalf of this contract"
+            _srcToken.approve(kyber, 0),
+            "Could not clean approval of kyber to use _srcToken on behalf of this contract"
         );
         // Check if the amount traded is greater or equal to the minimum required
         require(amount >= _minReturn, "Min return not reached");
-        // Transfer amount of _toTokens to msf.sender
+        // Transfer amount of _destTokens to msf.sender
         require(
-            _toToken.transfer(msg.sender, amount),
-            "Could not transfer amount of _toToken to msg.sender"
+            _destToken.transfer(msg.sender, amount),
+            "Could not transfer amount of _destToken to msg.sender"
         );
     }
 
-    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
+    function getExpectedRate(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 
     public view returns(uint256 expectedRate, uint256 slippageRate) 
     {
-        (expectedRate, slippageRate) = kyber.getExpectedRate(_fromToken, _toToken, _fromAmount);
+        (expectedRate, slippageRate) = kyber.getExpectedRate(_srcToken, _destToken, _srcAmount);
     }
 }

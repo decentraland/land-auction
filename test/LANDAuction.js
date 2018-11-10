@@ -157,7 +157,12 @@ contract('LANDAuction', function([
     landRegistry = await AssetRegistryToken.new(creationParams)
 
     // create KyberMock
-    kyberMock = await KyberMock.new(nchToken.address, dclToken.address)
+    kyberMock = await KyberMock.new(
+      [nchToken.address, dclToken.address],
+      [MAX_DECIMALS, SPECIAL_DECIMALS],
+      creationParams
+    )
+
     // Assign balance to KyberMock
     await manaToken.mint(web3.toWei(10, 'ether'), kyberMock.address)
 
@@ -194,8 +199,8 @@ contract('LANDAuction', function([
     // Supply bidders with other erc20 tokens and approve landAuction
     await nchToken.setBalance(web3.toWei(10, 'ether'), fromBidder)
     await nchToken.setBalance(web3.toWei(10, 'ether'), fromAnotherBidder)
-    await dclToken.setBalance(web3.toWei(10, 'ether'), fromBidder)
-    await dclToken.setBalance(web3.toWei(10, 'ether'), fromAnotherBidder)
+    await dclToken.setBalance(web3.toWei(10000000, 'Mwei'), fromBidder) // 10 ether cause it is 12 decimals contract
+    await dclToken.setBalance(web3.toWei(10000000, 'Mwei'), fromAnotherBidder) // 10 ether cause it is 12 decimals contract
     await nchToken.approve(
       landAuction.address,
       web3.toWei(10, 'ether'),
@@ -766,21 +771,20 @@ contract('LANDAuction', function([
       )
     })
 
-    //@nacho TODO: add a token with 12 decimals (maybe change DCL)
-    it.skip(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
+    it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
       // Allow token
       await landAuction.allowManyTokens(
-        [nchToken.address],
+        [dclToken.address],
         [SPECIAL_DECIMALS],
         [false],
         fromOwner
       )
 
       // Get prev balance of bidder of NCH token
-      const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
+      const bidderDCLPrevBalance = await dclToken.balanceOf(bidder)
 
       // Bid
-      const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
+      const { logs } = await landAuction.bid(xs, ys, bidder, dclToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
@@ -796,7 +800,7 @@ contract('LANDAuction', function([
         'BidSuccessful',
         {
           _beneficiary: bidder,
-          _token: nchToken.address,
+          _token: dclToken.address,
           _price: price.toString(),
           _totalPrice: (price * xs.length).toString(),
           _xs: xs,
@@ -810,12 +814,17 @@ contract('LANDAuction', function([
       balance.should.be.bignumber.equal(logs[0].args._totalPrice)
 
       // Check reserve of kyber and balance of bidder
-      const kyberNCHBalance = await nchToken.balanceOf(kyberMock.address)
-      const bidderNCHBalance = await nchToken.balanceOf(bidder)
-      kyberNCHBalance.should.be.bignumber.gt(0)
-      kyberNCHBalance.should.be.bignumber.equal(
-        bidderNCHPrevBalance.minus(bidderNCHBalance)
+      const kyberDCLBalance = await dclToken.balanceOf(kyberMock.address)
+      const bidderDCLBalance = await dclToken.balanceOf(bidder)
+
+      kyberDCLBalance.should.be.bignumber.gt(0)
+      kyberDCLBalance.should.be.bignumber.equal(
+        bidderDCLPrevBalance.minus(bidderDCLBalance)
       )
+
+      // Mana of bidder should keep the same or increase
+      const bidderMANABalance = await manaToken.balanceOf(bidder)
+      bidderMANABalance.should.be.bignumber.gt(web3.toWei(10, 'ether'))
     })
 
     it('reverts if user bids assigned LANDs', async function() {
@@ -1027,7 +1036,7 @@ contract('LANDAuction', function([
       address.should.be.equal(kyberConverter.address)
     })
 
-    it('reverts when changing to an address which is not a  contract', async function() {
+    it('reverts when changing to an address which is not a contract', async function() {
       await assertRevert(landAuction.setDex(bidder, fromOwner))
     })
 
