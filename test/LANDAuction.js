@@ -838,6 +838,10 @@ contract('LANDAuction', function([
           gasPrice: gasPriceLimit - 1
         }
       )
+
+      // Mana of bidder should keep the same or increase
+      const bidderMANABalance = await manaToken.balanceOf(bidder)
+      bidderMANABalance.should.be.bignumber.gt(web3.toWei(10, 'ether'))
     })
 
     it('reverts if user bids assigned LANDs', async function() {
