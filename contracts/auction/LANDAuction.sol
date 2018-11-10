@@ -339,19 +339,27 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
 
-        uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
+        tokenAllowed fromToken = tokensAllowed[address(_fromToken)];
         // Normalize to _fromToken decimals and calculate the amount of tokens to convert
         if (MAX_DECIMALS > fromTokenDecimals)  {
              // Ceil the result of the normalization always due to convertions fee
             totalPriceInToken = totalPriceInToken
-            .div(10**(MAX_DECIMALS - fromTokenDecimals))
+            .div(10**(MAX_DECIMALS - fromToken.decimals))
             .add(1);
         }
+
 
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
+
+        if (fromToken.shouldKeepToken) {
+            // Should keep a percentage of the token
+            // PERCENTAGE_OF_TOKEN_TO_KEEP will always be less than 100
+            totalPriceInToken = totalPriceInToken.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+            _totalPrice = _totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+        }
         
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 

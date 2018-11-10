@@ -844,6 +844,52 @@ contract('LANDAuction', function([
       bidderMANABalance.should.be.bignumber.gt(web3.toWei(10, 'ether'))
     })
 
+    it.only('should bid and keep a percentage of the token', async function() {
+      // Allow token
+      await landAuction.allowManyTokens(
+        [nchToken.address],
+        [MAX_DECIMALS],
+        [true],
+        fromOwner
+      )
+
+      // Bid
+      const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      // Check Log
+      const time = getBlockchainTime(logs[0].blockNumber)
+      const price = getPriceWithLinearFunction(time - initialTime)
+
+      logs.length.should.be.equal(1)
+
+      assertEvent(
+        normalizeEvent(logs[0]),
+        'BidSuccessful',
+        {
+          _beneficiary: bidder,
+          _token: nchToken.address,
+          _price: price.toString(),
+          _totalPrice: (price * xs.length).toString(),
+          _xs: xs,
+          _ys: ys
+        },
+        true
+      )
+
+      // Check MANA balance of LAND Auction contract
+      let balance = await manaToken.balanceOf(landAuction.address)
+      // balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+      console.log(balance.toString())
+
+      // Check NCH balance of LAND Auction contract
+      balance = await nchToken.balanceOf(landAuction.address)
+      console.log(balance.toString())
+      // balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+    })
+
     it('reverts if user bids assigned LANDs', async function() {
       await landAuction.bid(xs, ys, bidder, manaToken.address, {
         ...fromBidder,
