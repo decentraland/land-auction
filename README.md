@@ -31,7 +31,7 @@ contract LANDAuctionStorage {
     MANAToken public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
-    mapping (address => tokenAllowed) public tokensAllowed;
+    mapping (address => TokenAllowed) public tokensAllowed;
 
     event AuctionCreated(
       address indexed _caller,
@@ -45,7 +45,16 @@ contract LANDAuctionStorage {
       uint256 _time
     );
 
+    event BidConvertion(
+      uint256 _bidId,
+      address indexed _token,
+      uint256 _totalPriceInMana,
+      uint256 _totalPriceInToken,
+      uint256 _tokensKept
+    );
+
     event BidSuccessful(
+      uint256 _bidId,
       address indexed _beneficiary,
       address indexed _token,
       uint256 _price,
@@ -224,6 +233,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @return bool to confirm the convertion was successfully
     */
     function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
+
+    /**
+    * @dev Validate bid function params
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function validateBidParameters(
+        int[] _xs,
+        int[] _ys,
+        address _beneficiary,
+        ERC20 _fromToken
+    ) internal view;
 
 }
 ```

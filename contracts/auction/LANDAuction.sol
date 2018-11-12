@@ -138,15 +138,15 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
 
         uint256 currentPrice = getCurrentPrice();
-        uint256 totalPrice = _xs.length.mul(getCurrentPrice());
-        uint256 totalPriceInToken = 0;
+        uint256 totalPrice = _xs.length.mul(currentPrice);
+        
         if (address(_fromToken) != address(manaToken)) {
             require(
                 address(dex).isContract(), 
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            (totalPrice, totalPriceInToken) = convertSafe(_fromToken, totalPrice);
+            totalPrice = convertSafe(totalBids, _fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -164,16 +164,18 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
         landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
 
-
         emit BidSuccessful(
+            totalBids,
             _beneficiary,
             _fromToken,
             currentPrice,
             totalPrice,
-            totalPriceInToken,
             _xs,
             _ys
-        );
+        );  
+
+        // Increase bids count
+        totalBids++;
     }
 
     /**
@@ -277,7 +279,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
-        tokensAllowed[_address] = tokenAllowed({
+        tokensAllowed[_address] = Token({
             decimals: _decimals,
             shouldKeepToken: _shouldKeepToken,
             isAllowed: true
@@ -326,60 +328,74 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * Note that we will use the slippageRate cause it has a 3% buffer
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
-    * @return bool to confirm the convertion was successfully
+    * @return uint256 of the total amount of MANA
     */
     function convertSafe(
+        uint256 bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
-    ) internal returns (uint256 totalPrice, uint256 totalPriceInToken)
+    ) internal returns (uint256 totalPrice)
     {
         totalPrice = _totalPrice;
+        // Save the current MANA balance of the contract
         uint256 prevBalance = manaToken.balanceOf(address(this));
 
+        // Get rate
         uint256 tokenRate;
         (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, totalPrice);
 
-        totalPriceInToken = totalPrice.mul(tokenRate).div(10 ** 18);
+        // Calculate the amount of _fromToken needed
+        uint256 totalPriceInToken = totalPrice.mul(tokenRate).div(10 ** 18);
 
-        tokenAllowed memory fromToken = tokensAllowed[address(_fromToken)];
         // Normalize to _fromToken decimals and calculate the amount of tokens to convert
-        if (MAX_DECIMALS > fromTokenDecimals)  {
-             // Ceil the result of the normalization always due to convertions fee
-            totalPriceInToken = totalPriceInToken
-            .div(10**(MAX_DECIMALS - fromToken.decimals))
-            .add(1);
+        Token memory fromToken = tokensAllowed[address(_fromToken)];
+        if (MAX_DECIMALS > fromToken.decimals) {
+           
+            uint256 priceInToken = totalPriceInToken.div(10**(MAX_DECIMALS - fromToken.decimals));
+
+            // Solidity always truncate the result. if division has a remainder, we should
+            // increase 1 wei to ensure the price in MANA 
+            if (totalPriceInToken.mod(10**(MAX_DECIMALS - fromToken.decimals)) > 0) {
+                totalPriceInToken = priceInToken.add(1);
+            } else {
+                totalPriceInToken = priceInToken;
+            }
         }
 
-
+        // Transfer _fromToken amount from sender to the contract
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
 
+        // Check if contract should keep a percentage of _fromToken
+        uint256 tokensKept = 0;
         if (fromToken.shouldKeepToken) {
             // Should keep a percentage of the token
             // PERCENTAGE_OF_TOKEN_TO_KEEP will always be less than 100
-            totalPriceInToken = totalPriceInToken.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+            tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
             totalPrice = totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
         }
         
+        // Approve amount of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
-        // Convert token to MANA
+        // Convert _fromToken to MANA
         uint256 bought = dex.convert(
                 _fromToken,
                 manaToken,
-                totalPriceInToken,
+                totalPriceInToken - tokensKept,
                 totalPrice
             );
         
+        // Check the amount of MANA bought
         require(
             manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
             "Bought amount incorrect"
         );
 
+       // Return change in MANA to sender
         if (bought > totalPrice) {
-            // Return change in MANA to sender
             uint256 change = bought.sub(totalPrice);
             require(
                 manaToken.transfer(msg.sender, change),
@@ -387,7 +403,16 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             );
         }
 
-        require(_fromToken.approve(address(dex), 0), "Error remove approve");
+        // Remove approval of _fromToken owned by contract to be used by dex contract
+        require(_fromToken.approve(address(dex), 0), "Error remove approval");
+
+        emit BidConvertion(
+            bidId,
+            address(_fromToken),
+            totalPrice,
+            totalPriceInToken,
+            tokensKept
+        );
     }
 
     /** 

@@ -22,7 +22,7 @@ const AUCTION_STATUS_OP_CODES = {
 const MAX_DECIMALS = 18
 const SPECIAL_DECIMALS = 12
 
-const PERCENTAGE_OF_TOKEN_TO_KEEP = 5
+const PERCENTAGE_OF_TOKEN_TO_KEEP = 0.05
 
 function getBlockchainTime(blockNumber = 'latest') {
   return web3.eth.getBlock(blockNumber).timestamp
@@ -42,7 +42,12 @@ function normalizeEvent(log) {
   for (let key in args) {
     newArgs[key] = args[key]
     // _price, _totalPrice and _total to wei & two decimals due different round method between languages
-    if (key === '_price' || key === '_totalPrice' || key === '_total') {
+    if (
+      key === '_price' ||
+      key === '_totalPrice' ||
+      key === '_total' ||
+      key === '_totalPriceInMana'
+    ) {
       newArgs[key] = weiToDecimal(args[key]).toString()
     }
   }
@@ -626,6 +631,7 @@ contract('LANDAuction', function([
 
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
+      const totalPrice = price * xs.length
 
       logs.length.should.be.equal(1)
 
@@ -633,11 +639,11 @@ contract('LANDAuction', function([
         normalizeEvent(logs[0]),
         'BidSuccessful',
         {
+          _bidId: '0',
           _beneficiary: bidder,
           _token: manaToken.address,
           _price: price.toString(),
-          _totalPrice: (price * xs.length).toString(),
-          _totalPriceInToken: '0',
+          _totalPrice: totalPrice.toString(),
           _xs: xs,
           _ys: ys
         },
@@ -652,6 +658,54 @@ contract('LANDAuction', function([
 
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+    })
+
+    it('should increase bid id', async function() {
+      let res = await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      assertEvent(
+        normalizeEvent(res.logs[0]),
+        'BidSuccessful',
+        {
+          _bidId: '0',
+          _xs: xs,
+          _ys: ys
+        },
+        true
+      )
+
+      res = await landAuction.bid([10], [11], bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+      assertEvent(
+        normalizeEvent(res.logs[0]),
+        'BidSuccessful',
+        {
+          _bidId: '1',
+          _xs: [10],
+          _ys: [11]
+        },
+        true
+      )
+
+      res = await landAuction.bid([12], [13], bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+      assertEvent(
+        normalizeEvent(res.logs[0]),
+        'BidSuccessful',
+        {
+          _bidId: '2',
+          _xs: [12],
+          _ys: [13]
+        },
+        true
+      )
     })
 
     it('should increase balance of LANDAuction contract', async function() {
@@ -737,23 +791,37 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
+      const totalPrice = price * xs.length
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         nchToken.address,
-        logs[0].args._totalPrice
+        logs[0].args._totalPriceInMana
       )
 
-      logs.length.should.be.equal(1)
+      logs.length.should.be.equal(2)
 
       assertEvent(
         normalizeEvent(logs[0]),
+        'BidConvertion',
+        {
+          _bidId: '0',
+          _token: nchToken.address,
+          _totalPriceInMana: totalPrice.toString(),
+          _totalPriceInToken: totalPriceInToken.toString(),
+          _tokensKept: '0'
+        },
+        true
+      )
+
+      assertEvent(
+        normalizeEvent(logs[1]),
         'BidSuccessful',
         {
+          _bidId: '0',
           _beneficiary: bidder,
           _token: nchToken.address,
           _price: price.toString(),
-          _totalPrice: (price * xs.length).toString(),
-          _totalPriceInToken: totalPriceInToken.toString(),
+          _totalPrice: totalPrice.toString(),
           _xs: xs,
           _ys: ys
         },
@@ -769,7 +837,7 @@ contract('LANDAuction', function([
 
       // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
-      balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+      balance.should.be.bignumber.equal(logs[0].args._totalPriceInMana)
 
       // Check reserve of kyber and balance of bidder
       const kyberNCHBalance = await nchToken.balanceOf(kyberMock.address)
@@ -801,26 +869,40 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
+      const totalPrice = price * xs.length
 
       // add 1 cause we do the same in the contract to ensure the min MANA to buy
       // when dealing with tokens with less decimals than MANA
       const totalPriceInToken = (await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
-        logs[0].args._totalPrice
+        logs[0].args._totalPriceInMana
       )).add(1)
 
-      logs.length.should.be.equal(1)
+      logs.length.should.be.equal(2)
 
       assertEvent(
         normalizeEvent(logs[0]),
+        'BidConvertion',
+        {
+          _bidId: '0',
+          _token: dclToken.address,
+          _totalPriceInMana: totalPrice.toString(),
+          _totalPriceInToken: totalPriceInToken.toString(),
+          _tokensKept: '0'
+        },
+        true
+      )
+
+      assertEvent(
+        normalizeEvent(logs[1]),
         'BidSuccessful',
         {
+          _bidId: '0',
           _beneficiary: bidder,
           _token: dclToken.address,
           _price: price.toString(),
-          _totalPrice: (price * xs.length).toString(),
-          _totalPriceInToken: totalPriceInToken.toString(),
+          _totalPrice: totalPrice.toString(),
           _xs: xs,
           _ys: ys
         },
@@ -829,7 +911,7 @@ contract('LANDAuction', function([
 
       // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
-      balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+      balance.should.be.bignumber.equal(logs[0].args._totalPriceInMana)
 
       // Check reserve of kyber and balance of bidder
       const kyberDCLBalance = await dclToken.balanceOf(kyberMock.address)
@@ -862,7 +944,7 @@ contract('LANDAuction', function([
       bidderMANABalance.should.be.bignumber.gt(web3.toWei(10, 'ether'))
     })
 
-    it.only('should bid and keep a percentage of the token', async function() {
+    it('should bid and keep a percentage of the token', async function() {
       // Allow token
       await landAuction.allowManyTokens(
         [nchToken.address],
@@ -870,6 +952,9 @@ contract('LANDAuction', function([
         [true],
         fromOwner
       )
+
+      // Get prev balance of bidder of NCH token
+      const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
 
       // Bid
       const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
@@ -880,17 +965,41 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
       const price = getPriceWithLinearFunction(time - initialTime)
+      const totalPrice = price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+      const totalPriceInToken = await kyberMock.getReturn(
+        manaToken.address,
+        nchToken.address,
+        logs[1].args._price.mul(xs.length)
+      )
+      // Keep 5% percentage of the token
+      const tokensKept = totalPriceInToken
+        .mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+        .toFixed(0) // remove decimal
 
-      logs.length.should.be.equal(1)
+      logs.length.should.be.equal(2)
 
       assertEvent(
         normalizeEvent(logs[0]),
+        'BidConvertion',
+        {
+          _bidId: '0',
+          _token: nchToken.address,
+          _totalPriceInMana: totalPrice.toString(),
+          _totalPriceInToken: totalPriceInToken.toString(),
+          _tokensKept: tokensKept.toString()
+        },
+        true
+      )
+
+      assertEvent(
+        normalizeEvent(logs[1]),
         'BidSuccessful',
         {
+          _bidId: '0',
           _beneficiary: bidder,
           _token: nchToken.address,
           _price: price.toString(),
-          _totalPrice: (price * xs.length).toString(),
+          _totalPrice: totalPrice.toString(),
           _xs: xs,
           _ys: ys
         },
@@ -899,15 +1008,16 @@ contract('LANDAuction', function([
 
       // Check MANA balance of LAND Auction contract
       let balance = await manaToken.balanceOf(landAuction.address)
-      // balance.should.be.bignumber.equal(logs[0].args._totalPrice)
-      console.log(balance.toString())
+      balance.should.be.bignumber.equal(logs[0].args._totalPriceInMana)
 
       // Check NCH balance of LAND Auction contract
       balance = await nchToken.balanceOf(landAuction.address)
-      console.log(balance.toString())
-      // 1,900000000000000000
-      // 0,126238566047424000
-      // balance.should.be.bignumber.equal(logs[0].args._totalPrice)
+      balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+
+      balance = await nchToken.balanceOf(bidder)
+      balance.should.be.bignumber.equal(
+        bidderNCHPrevBalance.minus(logs[0].args._totalPriceInToken)
+      )
     })
 
     it('reverts if user bids assigned LANDs', async function() {
