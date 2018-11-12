@@ -62,6 +62,7 @@ contract LANDAuctionStorage {
       address indexed _token,
       uint256 _price,
       uint256 _totalPrice,
+      uint256 _totalPriceInToken,
       int[] _xs,
       int[] _ys
     );

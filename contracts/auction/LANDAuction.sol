@@ -130,25 +130,23 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) external whenNotPaused 
     {
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
-        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
-        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
-        require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
-        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
+        validateBidParameters(
+            _xs, 
+            _ys, 
+            _beneficiary, 
+            _fromToken
+        );
 
         uint256 currentPrice = getCurrentPrice();
-        uint256 totalPrice = _xs.length.mul(currentPrice);
-
+        uint256 totalPrice = _xs.length.mul(getCurrentPrice());
+        uint256 totalPriceInToken = 0;
         if (address(_fromToken) != address(manaToken)) {
             require(
                 address(dex).isContract(), 
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+            (totalPrice, totalPriceInToken) = convertSafe(_fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -159,10 +157,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Assign LANDs to _beneficiary
         for (uint i = 0; i < _xs.length; i++) {
-            int x = _xs[i];
-            int y = _ys[i];
             require(
-                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                -150 <= _xs[i] && _xs[i] <= 150 && -150 <= _ys[i] && _ys[i] <= 150,
                 "The coordinates should be inside bounds -150 & 150"
             );
         }
@@ -174,6 +170,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _fromToken,
             currentPrice,
             totalPrice,
+            totalPriceInToken,
             _xs,
             _ys
         );
@@ -331,15 +328,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return bool to confirm the convertion was successfully
     */
-    function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
+    function convertSafe(
+        ERC20 _fromToken,
+        uint256 _totalPrice
+    ) internal returns (uint256 totalPrice, uint256 totalPriceInToken)
+    {
+        totalPrice = _totalPrice;
         uint256 prevBalance = manaToken.balanceOf(address(this));
 
         uint256 tokenRate;
-        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, _totalPrice);
+        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, totalPrice);
 
-        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
+        totalPriceInToken = totalPrice.mul(tokenRate).div(10 ** 18);
 
-        tokenAllowed fromToken = tokensAllowed[address(_fromToken)];
+        tokenAllowed memory fromToken = tokensAllowed[address(_fromToken)];
         // Normalize to _fromToken decimals and calculate the amount of tokens to convert
         if (MAX_DECIMALS > fromTokenDecimals)  {
              // Ceil the result of the normalization always due to convertions fee
@@ -358,7 +360,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             // Should keep a percentage of the token
             // PERCENTAGE_OF_TOKEN_TO_KEEP will always be less than 100
             totalPriceInToken = totalPriceInToken.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
-            _totalPrice = _totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+            totalPrice = totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
         }
         
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
@@ -368,7 +370,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 _fromToken,
                 manaToken,
                 totalPriceInToken,
-                _totalPrice
+                totalPrice
             );
         
         require(
@@ -376,9 +378,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "Bought amount incorrect"
         );
 
-        if (bought > _totalPrice) {
+        if (bought > totalPrice) {
             // Return change in MANA to sender
-            uint256 change = bought.sub(_totalPrice);
+            uint256 change = bought.sub(totalPrice);
             require(
                 manaToken.transfer(msg.sender, change),
                 "Transfering the change to sender failed"
@@ -386,6 +388,29 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
 
         require(_fromToken.approve(address(dex), 0), "Error remove approve");
-        return true;
+    }
+
+    /** 
+    * @dev Validate bid function params
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function validateBidParameters(
+        int[] _xs, 
+        int[] _ys, 
+        address _beneficiary, 
+        ERC20 _fromToken
+    ) internal view 
+    {
+        require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
+        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
+        require(_xs.length > 0, "You should bid to at least one LAND");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
+        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
     }
 }
