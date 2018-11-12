@@ -1,4 +1,5 @@
-require('dotenv').config()
+require('babel-register')
+require('babel-polyfill')
 
 const HDWalletProvider = require('truffle-hdwallet-provider')
 
@@ -53,7 +54,7 @@ module.exports = {
     },
     ganache: {
       host: 'localhost',
-      port: 8545,
+      port: 8555,
       network_id: '*' // eslint-disable-line camelcase
     }
   }
