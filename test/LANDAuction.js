@@ -828,7 +828,7 @@ contract('LANDAuction', function([
     })
 
     it('should bid with less gas Price', async function() {
-      await landAuction.bid([-150, 150], [-150, 150], bidder, {
+      await landAuction.bid([-150, 150], [-150, 150], bidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit - 1
       })
