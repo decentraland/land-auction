@@ -27,8 +27,9 @@ contract LANDAuctionStorage {
     enum Status { created, started, finished }
 
     struct Func {
-        uint256[2] xPoints;
-        uint256[2] yPoints;
+        int256 start;
+        int256 base;
+        int256 slope;
     }
     struct tokenAllowed {
         uint256 decimals;
@@ -47,14 +48,14 @@ contract LANDAuctionStorage {
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startedTime;
-    uint256 internal duration;
+    uint256 internal startTime;
+    uint256 internal endTime;
 
     event AuctionCreated(
       address indexed _caller,
       uint256 _initialPrice,
       uint256 _endPrice,
-      uint256 _duration
+      uint256 _endTime
     );
 
     event AuctionStarted(

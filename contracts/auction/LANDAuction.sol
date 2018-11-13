@@ -47,9 +47,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
 
-        // Set total duration of the auction
-        duration = _xPoints[_xPoints.length - 1];
-        require(duration > 24 * 60 * 60, "The duration should be greater than 1 day");
+        // Validate _xPoints and _yPoints
+        _validate(_xPoints, _yPoints);
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
@@ -61,7 +60,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             msg.sender,
             initialPrice,
             endPrice,
-            duration
+            endTime
         );
     }
 
@@ -357,6 +356,29 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_fromToken.approve(address(dex), 0), "Error remove approve");
         return true;
     }
+    
+    /**
+     * @dev Validate that the points of a curve are valid Dutch auction values
+     * Fails if points are invalid.
+     * 
+     * @param _xPoints - uint256[] of x values
+     * @param _yPoints - uint256[] of y values
+     */
+    function _validate(uint256[] _xPoints, uint256[] _yPoints) internal {
+        uint256 pointsLength = _xPoints.length;
+        require(pointsLength == _yPoints.length, "xPoints and yPoints must have matching length");
+
+        uint256 previousValue = _xPoint[0];
+        for (uint i = 1; i < pointsLength - 1; i++) {
+            require(_xPoint[i] > previousValue, "xPoints array must have strictly increasing X values");
+            previousValue = _xPoint[i];
+        }
+        previousValue = _yPoint[0];
+        for (uint i = 1; i < pointsLength - 1; i++) {
+            require(_yPoint[i] < previousValue, "yPoints array must have strictly decreasing values");
+            previousValue = _yPoint[i];
+        }
+    }
 
     /**
     * @dev Create a combined function.
@@ -366,17 +388,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
         uint256 pointsLength = _xPoints.length;
-        require(pointsLength == _yPoints.length, "Points should have the same length");
+
         for (uint i = 0; i < pointsLength - 1; i++) {
-            uint256 x1 = _xPoints[i];
-            uint256 x2 = _xPoints[i 1];
-            uint256 y1 = _yPoints[i];
-            uint256 y2 = _yPoints[i 1];
-            require(x1 < x2, "X points should increase");
-            require(y1 > y2, "Y points should decrease");
+            int256 x1 = _xPoints[i];
+            int256 x2 = _xPoints[i+1];
+            int256 y1 = _yPoints[i];
+            int256 y2 = _yPoints[i+1];
+
+            int256 slope = y2.sub(y1).div(x2.sub(x1));
+            int256 base = y1.minus(slope.times(x1));
+
             curves.push(Func({
-                xPoints: [x1, x2],
-                yPoints: [y1, y2]
+                start: x1,
+                base: base,
+                slope: slope
             }));
         }
 
@@ -395,45 +420,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _getPrice(uint256 _time) internal view returns (uint256) {
         for (uint i = 0; i < curves.length; i++) {
             Func memory func = curves[i];
-            uint256 x2 = func.xPoints[1];
-            if (_time < x2) {
-                uint256 x1 = func.xPoints[0];
-                uint256 y1 = func.yPoints[0];
-                uint256 y2 = func.yPoints[1];
-                return _calculate(
-                    x1,
-                    x2,
-                    y1,
-                    y2,
-                    _time
-                );
+            int256 start = func.start;
+            if (_time > start) {
+                return (curves[i].base).plus(curves[i].slope.times(_time));
             }
         }
-    }
-
-    /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * Based on two points (x1; x2) and (y1; y2)
-    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
-    * @param _x1 - uint256 x1 value
-    * @param _x2 - uint256 x2 value
-    * @param _y1 - uint256 y1 value
-    * @param _y2 - uint256 y2 value
-    * @param _val - uint256 val passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _calculate(
-        uint256 _x1,
-        uint256 _x2,
-        uint256 _y1,
-        uint256 _y2,
-        uint256 _val
-    ) internal pure returns (uint256)
-    {
-        uint256 b = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
-        uint256 slope = (_y1.sub(_y2)).mul(_val).div(_x2.sub(_x1));
-        return b.sub(slope);
     }
 }
