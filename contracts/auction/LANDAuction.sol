@@ -700,4 +700,83 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _incrementBids() private {
         totalBids = totalBids.add(1);
     }
+
+    /** 
+    * @dev Create a combined function.
+    * note that we will set N - 1 function combinations based on N points (x,y)
+    * @param _xPoints - uint256[] of x values
+    * @param _yPoints - uint256[] of y values
+    */
+    function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
+        uint256 pointsLength = _xPoints.length;
+        require(pointsLength == _yPoints.length, "Points should have the same length");
+        for (uint i = 0; i < pointsLength - 1; i++) {
+            uint256 x1 = _xPoints[i];
+            uint256 x2 = _xPoints[i + 1];
+            uint256 y1 = _yPoints[i];
+            uint256 y2 = _yPoints[i + 1];
+            require(x1 < x2, "X points should increase");
+            require(y1 > y2, "Y points should decrease");
+            curves.push(Func({
+                xPoints: [x1, x2],
+                yPoints: [y1, y2]
+            }));
+        }
+
+        initialPrice = _yPoints[0];
+        endPrice = _yPoints[pointsLength - 1];
+    }
+
+
+    /**
+    * @dev LAND price based on time
+    * Note that will select the function to calculate based on the time
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256) {
+        for (uint i = 0; i < curves.length; i++) {
+            Func memory func = curves[i];
+            uint256 x2 = func.xPoints[1];
+            if (_time < x2) {
+                uint256 x1 = func.xPoints[0];
+                uint256 y1 = func.yPoints[0];           
+                uint256 y2 = func.yPoints[1];       
+                return _calculate(
+                    x1, 
+                    x2, 
+                    y1, 
+                    y2, 
+                    _time
+                );
+            }
+        }
+    }
+
+    /**
+    * @dev Calculate LAND price based on time
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * As Solidity does not support negative number we use it as: y = b - ax
+    * Based on two points (x1; x2) and (y1; y2)
+    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
+    * @param _x1 - uint256 x1 value
+    * @param _x2 - uint256 x2 value
+    * @param _y1 - uint256 y1 value
+    * @param _y2 - uint256 y2 value
+    * @param _val - uint256 val passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _calculate(
+        uint256 _x1,
+        uint256 _x2,
+        uint256 _y1, 
+        uint256 _y2,
+        uint256 _val
+    ) internal pure returns (uint256) 
+    {
+        uint256 b = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
+        uint256 slope = (_y1.sub(_y2)).mul(_val).div(_x2.sub(_x1));
+        return b.sub(slope); 
+    }
 }

@@ -830,9 +830,8 @@ contract('LANDAuction', function([
         }
       )
 
-      const time = getBlockchainTime(logs[0].blockNumber)
-      const price = getPriceWithLinearFunction(time - initialTime)
-      const totalPrice = price * xs.length
+      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
+      const price = getPriceWithLinearFunction(time)
 
       logs.length.should.be.equal(2)
 
@@ -855,7 +854,9 @@ contract('LANDAuction', function([
           _beneficiary: bidder,
           _token: manaToken.address,
           _price: price.toString(),
-          _totalPrice: totalPrice.toString(),
+          _totalPrice: weiToDecimal(
+            getPriceWithLinearFunction(time, false) * xs.length
+          ).toString(),
           _xs: xs,
           _ys: ys
         },
@@ -1144,7 +1145,7 @@ contract('LANDAuction', function([
 
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - initialTime
-      const price = getPriceWithLinearFunction(time - initialTime)
+      const price = getPriceWithLinearFunction(time)
 
       // add 1 cause we do the same in the contract to ensure the min MANA to buy
       // when dealing with tokens with less decimals than MANA
