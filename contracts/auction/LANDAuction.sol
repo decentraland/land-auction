@@ -12,49 +12,49 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     using Address for address;
 
     /**
-    * @dev Constructor of the contract
-    * @param _initialPrice - uint256 initial LAND price
-    * @param _endPrice - uint256 end LAND price
-    * @param _duration - uint256 duration of the auction in seconds
+    * @dev Constructor of the contract.
+    * Note that the last value of _xPoints will be the total duration and
+    * the first value of _yPoints will be the initial price and the last value will be the endPrice
+    * @param _xPoints - uint256[] of seconds
+    * @param _yPoints - uint256[] of prices
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
     */
     constructor(
-        uint256 _initialPrice, 
-        uint256 _endPrice, 
-        uint256 _duration, 
+        uint256[] _xPoints, 
+        uint256[] _yPoints, 
         ERC20 _manaToken, 
         LANDRegistry _landRegistry,
         address _dex
     ) public {
+        // Initialize owneable
         Ownable.initialize(msg.sender);
 
+        // Set LANDRegistry
         require(
             address(_landRegistry).isContract(),
             "The LANDRegistry token address must be a deployed contract"
         );
         landRegistry = _landRegistry;
 
+        // Set Dex
         if (_dex != address(0)) {
             setDex(_dex);
         }
 
+        // Set MANAToken
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
 
-        require(_initialPrice > _endPrice, "The start price should be greater than end price");
-        require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
+        // Set total duration of the auction
+        duration = _xPoints[_xPoints.length - 1];
+        require(duration > 24 * 60 * 60, "The duration should be greater than 1 day");
 
-        duration = _duration;
-        initialPrice = _initialPrice;
-        endPrice = _endPrice;
-
-        require(
-            endPrice == _getPrice(duration),
-            "The end price defined should be achieved when auction ends"
-        );
-
+        // Set Curve
+        _setCurve(_xPoints, _yPoints);
+        
+        // Initialize status
         status = Status.created;      
 
         emit AuctionCreated(
@@ -137,7 +137,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+            require(_convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -191,14 +191,19 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Current LAND price. If the auction was not started returns the started price
+    * @dev Current LAND price. 
+    * Note that if the auction was not started returns the started price and when
+    * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
     function getCurrentPrice() public view returns (uint256) { 
         if (startedTime == 0) {
-            return _getPrice(0);
+            return initialPrice;
         } else {
             uint256 timePassed = block.timestamp - startedTime;
+            if (timePassed >= duration) {
+                return endPrice;
+            }
             return _getPrice(timePassed);
         }
     }
@@ -297,30 +302,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startedTime)
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * It should return endPrice if _time < duration
-    * @param _time - uint256 time passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _getPrice(uint256 _time) internal view returns (uint256) {
-        if (_time >= duration) {
-            return endPrice;
-        }
-        return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
-    }
-
-    /**
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
     * Note that we will use the slippageRate cause it has a 3% buffer
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return bool to confirm the convertion was successfully
     */
-    function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
+    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
         uint256 prevBalance = manaToken.balanceOf(address(this));
 
         uint256 tokenRate;
@@ -330,7 +318,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
         // Normalize to _fromToken decimals and calculate the amount of tokens to convert
-        if (MAX_DECIMALS > fromTokenDecimals)  {
+        if (MAX_DECIMALS > fromTokenDecimals) {
              // Ceil the result of the normalization always fue to convertions fee
             totalPriceInToken = totalPriceInToken
             .div(10**(MAX_DECIMALS - fromTokenDecimals))
@@ -368,5 +356,84 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         require(_fromToken.approve(address(dex), 0), "Error remove approve");
         return true;
+    }
+
+    /** 
+    * @dev Create a combined function.
+    * note that we will set N - 1 function combinations based on N points (x,y)
+    * @param _xPoints - uint256[] of x values
+    * @param _yPoints - uint256[] of y values
+    */
+    function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
+        uint256 pointsLength = _xPoints.length;
+        require(pointsLength == _yPoints.length, "Points should have the same length");
+        for (uint i = 0; i < pointsLength - 1; i++) {
+            uint256 x1 = _xPoints[i];
+            uint256 x2 = _xPoints[i + 1];
+            uint256 y1 = _yPoints[i];
+            uint256 y2 = _yPoints[i + 1];
+            require(x1 < x2, "X points should increase");
+            require(y1 > y2, "Y points should decrease");
+            curves.push(Func({
+                xPoints: [x1, x2],
+                yPoints: [y1, y2]
+            }));
+        }
+
+        initialPrice = _yPoints[0];
+        endPrice = _yPoints[pointsLength - 1];
+    }
+
+
+    /**
+    * @dev LAND price based on time
+    * Note that will select the function to calculate based on the time
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256) {
+        for (uint i = 0; i < curves.length; i++) {
+            Func memory func = curves[i];
+            uint256 x2 = func.xPoints[1];
+            if (_time < x2) {
+                uint256 x1 = func.xPoints[0];
+                uint256 y1 = func.yPoints[0];           
+                uint256 y2 = func.yPoints[1];       
+                return _calculate(
+                    x1, 
+                    x2, 
+                    y1, 
+                    y2, 
+                    _time
+                );
+            }
+        }
+    }
+
+    /**
+    * @dev Calculate LAND price based on time
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * As Solidity does not support negative number we use it as: y = b - ax
+    * Based on two points (x1; x2) and (y1; y2)
+    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
+    * @param _x1 - uint256 x1 value
+    * @param _x2 - uint256 x2 value
+    * @param _y1 - uint256 y1 value
+    * @param _y2 - uint256 y2 value
+    * @param _val - uint256 val passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _calculate(
+        uint256 _x1,
+        uint256 _x2,
+        uint256 _y1, 
+        uint256 _y2,
+        uint256 _val
+    ) internal pure returns (uint256) 
+    {
+        uint256 b = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
+        uint256 slope = (_y1.sub(_y2)).mul(_val).div(_x2.sub(_x1));
+        return b.sub(slope); 
     }
 }
