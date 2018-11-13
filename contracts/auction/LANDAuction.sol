@@ -22,9 +22,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
     */
     constructor(
-        uint256[] _xPoints, 
-        uint256[] _yPoints, 
-        ERC20 _manaToken, 
+        uint256[] _xPoints,
+        uint256[] _yPoints,
+        ERC20 _manaToken,
         LANDRegistry _landRegistry,
         address _dex
     ) public {
@@ -53,13 +53,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
-        
+
         // Initialize status
-        status = Status.created;      
+        status = Status.created;
 
         emit AuctionCreated(
             msg.sender,
-            initialPrice, 
+            initialPrice,
             endPrice,
             duration
         );
@@ -73,8 +73,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function startAuction(
         uint256 _landsLimitPerBid,
         uint256 _gasPriceLimit
-    ) 
-    external onlyOwner 
+    )
+    external onlyOwner
     {
         require(status == Status.created, "The auction was started");
 
@@ -113,11 +113,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _fromToken - token used to bid
     */
     function bid(
-        int[] _xs, 
-        int[] _ys, 
-        address _beneficiary, 
+        int[] _xs,
+        int[] _ys,
+        address _beneficiary,
         ERC20 _fromToken
-    ) external 
+    ) external
     {
         require(status == Status.started, "The auction was not started");
         require(block.timestamp - startedTime <= duration, "The auction has finished");
@@ -133,7 +133,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         if (address(_fromToken) != address(manaToken)) {
             require(
-                address(dex).isContract(), 
+                address(dex).isContract(),
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
@@ -175,8 +175,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _shouldKeepToken - array of boolean whether we should keep the token or not
     */
     function allowManyTokens(
-        address[] _address, 
-        uint256[] _decimals, 
+        address[] _address,
+        uint256[] _decimals,
         bool[] _shouldKeepToken
     ) external onlyOwner
     {
@@ -191,12 +191,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Current LAND price. 
+    * @dev Current LAND price.
     * Note that if the auction was not started returns the started price and when
     * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
-    function getCurrentPrice() public view returns (uint256) { 
+    function getCurrentPrice() public view returns (uint256) {
         if (startedTime == 0) {
             return initialPrice;
         } else {
@@ -209,7 +209,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Finish auction 
+    * @dev Finish auction
     */
     function finishAuction() public onlyOwner {
         require(status != Status.finished, "The auction is finished");
@@ -259,10 +259,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _shouldKeepToken - boolean whether we should keep the token or not
     */
     function allowToken(
-        address _address, 
-        uint256 _decimals, 
-        bool _shouldKeepToken) 
-    public onlyOwner 
+        address _address,
+        uint256 _decimals,
+        bool _shouldKeepToken)
+    public onlyOwner
     {
         require(
             _address.isContract(),
@@ -281,9 +281,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         });
 
         emit TokenAllowed(
-            msg.sender, 
-            _address, 
-            _decimals, 
+            msg.sender,
+            _address,
+            _decimals,
             _shouldKeepToken
         );
     }
@@ -329,7 +329,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
-        
+
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
         // Convert token to MANA
@@ -339,7 +339,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 totalPriceInToken,
                 _totalPrice
             );
-        
+
         require(
             manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
             "Bought amount incorrect"
@@ -358,7 +358,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         return true;
     }
 
-    /** 
+    /**
     * @dev Create a combined function.
     * note that we will set N - 1 function combinations based on N points (x,y)
     * @param _xPoints - uint256[] of x values
@@ -369,9 +369,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(pointsLength == _yPoints.length, "Points should have the same length");
         for (uint i = 0; i < pointsLength - 1; i++) {
             uint256 x1 = _xPoints[i];
-            uint256 x2 = _xPoints[i + 1];
+            uint256 x2 = _xPoints[i 1];
             uint256 y1 = _yPoints[i];
-            uint256 y2 = _yPoints[i + 1];
+            uint256 y2 = _yPoints[i 1];
             require(x1 < x2, "X points should increase");
             require(y1 > y2, "Y points should decrease");
             curves.push(Func({
@@ -398,13 +398,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             uint256 x2 = func.xPoints[1];
             if (_time < x2) {
                 uint256 x1 = func.xPoints[0];
-                uint256 y1 = func.yPoints[0];           
-                uint256 y2 = func.yPoints[1];       
+                uint256 y1 = func.yPoints[0];
+                uint256 y2 = func.yPoints[1];
                 return _calculate(
-                    x1, 
-                    x2, 
-                    y1, 
-                    y2, 
+                    x1,
+                    x2,
+                    y1,
+                    y2,
                     _time
                 );
             }
@@ -427,13 +427,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _calculate(
         uint256 _x1,
         uint256 _x2,
-        uint256 _y1, 
+        uint256 _y1,
         uint256 _y2,
         uint256 _val
-    ) internal pure returns (uint256) 
+    ) internal pure returns (uint256)
     {
         uint256 b = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
         uint256 slope = (_y1.sub(_y2)).mul(_val).div(_x2.sub(_x1));
-        return b.sub(slope); 
+        return b.sub(slope);
     }
 }
