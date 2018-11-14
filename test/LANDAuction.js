@@ -585,6 +585,13 @@ contract('LANDAuction', function([
       })
     })
 
+    it('should bid with less gas Price', async function() {
+      await landAuction.bid([-150, 150], [-150, 150], bidder, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit - 1
+      })
+    })
+
     it('reverts if user bids assigned LANDs', async function() {
       await landAuction.bid(xs, ys, bidder, {
         ...fromBidder,
