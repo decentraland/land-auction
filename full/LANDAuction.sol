@@ -324,21 +324,38 @@ contract LANDAuctionStorage {
 
     enum Status { created, started, finished }
 
+<<<<<<< HEAD
     struct Token {
+=======
+    struct Func {
+        uint256 slope;
+        uint256 base;
+        uint256 limit;
+    }
+    struct tokenAllowed {
+>>>>>>> feat: simplify computation
         uint256 decimals;
         bool shouldKeepToken;
         bool isAllowed;
     }
 
+<<<<<<< HEAD
     uint256 public convertionFee = 105;
     uint256 public totalBids = 0;
+=======
+>>>>>>> feat: simplify computation
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
+<<<<<<< HEAD
     mapping (address => Token) public tokensAllowed;
+=======
+    mapping (address => tokenAllowed) public tokensAllowed;
+    Func[] internal curves;
+>>>>>>> feat: simplify computation
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -431,34 +448,38 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     using Address for address;
 
     /**
-    * @dev Constructor of the contract
-    * @param _initialPrice - uint256 initial LAND price
-    * @param _endPrice - uint256 end LAND price
-    * @param _duration - uint256 duration of the auction in seconds
+    * @dev Constructor of the contract.
+    * Note that the last value of _xPoints will be the total duration and
+    * the first value of _yPoints will be the initial price and the last value will be the endPrice
+    * @param _xPoints - uint256[] of seconds
+    * @param _yPoints - uint256[] of prices
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
     */
     constructor(
-        uint256 _initialPrice, 
-        uint256 _endPrice, 
-        uint256 _duration, 
+        uint256[] _xPoints, 
+        uint256[] _yPoints, 
         ERC20 _manaToken, 
         LANDRegistry _landRegistry,
         address _dex
     ) public {
+        // Initialize owneable
         Ownable.initialize(msg.sender);
 
+        // Set LANDRegistry
         require(
             address(_landRegistry).isContract(),
             "The LANDRegistry token address must be a deployed contract"
         );
         landRegistry = _landRegistry;
 
+        // Set Dex
         if (_dex != address(0)) {
             setDex(_dex);
         }
 
+<<<<<<< HEAD
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
 
@@ -473,7 +494,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             endPrice == _getPrice(duration),
             "The end price defined should be achieved when auction ends"
         );
+=======
+        // Set MANAToken
+        allowToken(address(_manaToken), 18, true);
+        manaToken = _manaToken;
 
+        // Set total duration of the auction
+        duration = _xPoints[_xPoints.length - 1];
+        require(duration > 24 * 60 * 60, "The duration should be greater than 1 day");
+>>>>>>> feat: simplify computation
+
+        // Set Curve
+        _setCurve(_xPoints, _yPoints);
+        
+        // Initialize status
         status = Status.created;      
 
         emit AuctionCreated(
@@ -545,12 +579,23 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) external 
     {
+<<<<<<< HEAD
         _validateBidParameters(
             _xs, 
             _ys, 
             _beneficiary, 
             _fromToken
         );
+=======
+        require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
+        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
+        require(_xs.length > 0, "You should bid to at least one LAND");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
+        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
+>>>>>>> feat: simplify computation
 
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -561,7 +606,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
+<<<<<<< HEAD
             totalPrice = _convertSafe(totalBids, _fromToken, totalPrice);
+=======
+            require(_convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+>>>>>>> feat: simplify computation
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -625,14 +674,41 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Current LAND price. If the auction was not started returns the started price
+    * @dev Allow many ERC20 tokens to to be used for bidding
+    * @param _address - array of addresses of the ERC20 Token
+    * @param _decimals - array of uint256 of the number of decimals
+    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
+    */
+    function allowManyTokens(
+        address[] _address, 
+        uint256[] _decimals, 
+        bool[] _shouldKeepToken
+    ) external onlyOwner
+    {
+        require(
+            _address.length == _decimals.length && _decimals.length == _shouldKeepToken.length,
+            "The length of _addresses, decimals and _shouldKeepToken should be the same"
+        );
+
+        for (uint i = 0; i < _address.length; i++) {
+            allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
+        }
+    }
+
+    /**
+    * @dev Current LAND price. 
+    * Note that if the auction was not started returns the started price and when
+    * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
     function getCurrentPrice() public view returns (uint256) { 
         if (startedTime == 0) {
-            return _getPrice(0);
+            return initialPrice;
         } else {
             uint256 timePassed = block.timestamp - startedTime;
+            if (timePassed >= duration) {
+                return endPrice;
+            }
             return _getPrice(timePassed);
         }
     }
@@ -703,7 +779,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
+<<<<<<< HEAD
         tokensAllowed[_address] = Token({
+=======
+        tokensAllowed[_address] = tokenAllowed({
+>>>>>>> feat: simplify computation
             decimals: _decimals,
             shouldKeepToken: _shouldKeepToken,
             isAllowed: true
@@ -731,6 +811,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
+<<<<<<< HEAD
     * @dev Get exchange rate
     * @param _srcToken - IERC20 token
     * @param _destToken - IERC20 token 
@@ -764,6 +845,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
+=======
+>>>>>>> feat: simplify computation
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
     * the convertion fee.
@@ -771,6 +854,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
+<<<<<<< HEAD
     function _convertSafe(
         uint256 bidId,
         ERC20 _fromToken,
@@ -807,6 +891,25 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
          }
 
         // Transfer _fromToken amount from sender to the contract
+=======
+    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
+        uint256 prevBalance = manaToken.balanceOf(address(this));
+
+        uint256 tokenRate;
+        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, _totalPrice);
+
+        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
+
+        uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
+        // Normalize to _fromToken decimals and calculate the amount of tokens to convert
+        if (MAX_DECIMALS > fromTokenDecimals) {
+             // Ceil the result of the normalization always fue to convertions fee
+            totalPriceInToken = totalPriceInToken
+            .div(10**(MAX_DECIMALS - fromTokenDecimals))
+            .add(1);
+        }
+
+>>>>>>> feat: simplify computation
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
@@ -815,6 +918,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Approve amount of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
+<<<<<<< HEAD
         // Convert _fromToken to MANA
         require(
             dex.convert(
@@ -830,6 +934,24 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 change = _fromToken.balanceOf(address(this)) - prevTokenBalance - tokensToKeep;
         if (change > 0) {
             // Return the change of src token
+=======
+        // Convert token to MANA
+        uint256 bought = dex.convert(
+                _fromToken,
+                manaToken,
+                totalPriceInToken,
+                _totalPrice
+            );
+        
+        require(
+            manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
+            "Bought amount incorrect"
+        );
+
+        if (bought > _totalPrice) {
+            // Return change in MANA to sender
+            uint256 change = bought.sub(_totalPrice);
+>>>>>>> feat: simplify computation
             require(
                 _fromToken.transfer(msg.sender, change),
                 "Transfering the change to sender failed"
@@ -928,5 +1050,76 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             )), 
             "Burn can not be performed for this token"
         );        
+    }
+
+    /** 
+    * @dev Create a combined function.
+    * note that we will set N - 1 function combinations based on N points (x,y)
+    * @param _xPoints - uint256[] of x values
+    * @param _yPoints - uint256[] of y values
+    */
+    function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
+        uint256 pointsLength = _xPoints.length;
+        require(pointsLength == _yPoints.length, "Points should have the same length");
+        for (uint i = 0; i < pointsLength - 1; i++) {
+            uint256 x1 = _xPoints[i];
+            uint256 x2 = _xPoints[i + 1];
+            uint256 y1 = _yPoints[i];
+            uint256 y2 = _yPoints[i + 1];
+            require(x1 < x2, "X points should increase");
+            require(y1 > y2, "Y points should decrease");
+            (uint256 base, uint256 slope) = _getFunc(x1, x2, y1, y2);
+            curves.push(Func({
+                base: base,
+                slope: slope,
+                limit: x2
+            }));
+        }
+
+        initialPrice = _yPoints[0];
+        endPrice = _yPoints[pointsLength - 1];
+    }
+
+
+    /**
+    * @dev LAND price based on time
+    * Note that will select the function to calculate based on the time
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256) {
+        for (uint i = 0; i < curves.length; i++) {
+            Func memory func = curves[i];
+            if (_time < func.limit) {
+                return func.base.sub(func.slope.mul(_time));
+            }
+        }
+        revert("Invalid time");
+    }
+
+    /**
+    * @dev Calculate base and slope for the given points
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * As Solidity does not support negative number we use it as: y = b - ax
+    * Based on two points (x1; x2) and (y1; y2)
+    * base = (x2 * y1) - (x1 * y2) / x2 - x1
+    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
+    * @param _x1 - uint256 x1 value
+    * @param _x2 - uint256 x2 value
+    * @param _y1 - uint256 y1 value
+    * @param _y2 - uint256 y2 value
+    * @return uint256 for the base
+    * @return uint256 for the slope
+    */
+    function _getFunc(
+        uint256 _x1,
+        uint256 _x2,
+        uint256 _y1, 
+        uint256 _y2
+    ) internal pure returns (uint256 base, uint256 slope) 
+    {
+        base = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
+        slope = (_y1.sub(_y2)).div(_x2.sub(_x1));
     }
 }

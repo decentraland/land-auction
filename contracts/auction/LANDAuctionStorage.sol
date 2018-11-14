@@ -27,8 +27,9 @@ contract LANDAuctionStorage {
     enum Status { created, started, finished }
 
     struct Func {
-        uint256[2] xPoints;
-        uint256[2] yPoints;
+        uint256 slope;
+        uint256 base;
+        uint256 limit;
     }
     struct Token {
         uint256 decimals;

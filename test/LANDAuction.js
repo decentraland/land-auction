@@ -7,12 +7,12 @@ require('chai')
   .use(require('chai-bignumber')(BigNumber))
   .should()
 
-const LANDAuction = artifacts.require('LANDAuction')
+const LANDAuction = artifacts.require('LANDAuctionTest')
 const ERC20Token = artifacts.require('ERC20Test')
 const ERC20WithoutBurn = artifacts.require('ERC20WithoutBurn')
 const AssetRegistryToken = artifacts.require('AssetRegistryTest')
-const KyberConverter = artifacts.require('KyberConverter.sol')
-const KyberMock = artifacts.require('KyberMock.sol')
+const KyberConverter = artifacts.require('KyberConverter')
+const KyberMock = artifacts.require('KyberMock')
 
 const AUCTION_STATUS_OP_CODES = {
   created: 0,
@@ -30,7 +30,7 @@ function getBlockchainTime(blockNumber = 'latest') {
   return web3.eth.getBlock(blockNumber).timestamp
 }
 
-function parseFloatWithDecimal(num, decimals = 2) {
+function parseFloatWithDecimal(num, decimals = 1) {
   return parseFloat(parseFloat(num).toFixed(decimals))
 }
 
@@ -147,6 +147,25 @@ contract('LANDAuction', function([
     auctionDuration
   ]
 
+  const PRICES = [
+    initialPrice,
+    web3.toWei(100000, 'ether'),
+    web3.toWei(50000, 'ether'),
+    web3.toWei(45000, 'ether'),
+    web3.toWei(40000, 'ether'),
+    web3.toWei(35000, 'ether'),
+    web3.toWei(30000, 'ether'),
+    web3.toWei(25000, 'ether'),
+    web3.toWei(22000, 'ether'),
+    web3.toWei(19000, 'ether'),
+    web3.toWei(16000, 'ether'),
+    web3.toWei(13000, 'ether'),
+    web3.toWei(10000, 'ether'),
+    web3.toWei(7000, 'ether'),
+    web3.toWei(4000, 'ether'),
+    endPrice
+  ]
+
   const zeroAddress = '0x0000000000000000000000000000000000000000'
   const landsLimitPerBid = 20
   const gasPriceLimit = 4
@@ -190,9 +209,9 @@ contract('LANDAuction', function([
   const getPriceWithLinearFunction = (time, toWei = true) => {
     const { x1, x2, y1, y2 } = getFunc(time)
 
-    const b = (x2 * y1 - x1 * y2) / (x2 - x1)
-    const slope = ((y1 - y2) * time) / (x2 - x1)
-    let price = b - slope
+    const b = ((x2 * y1 - x1 * y2) * 10 ** 18) / (x2 - x1)
+    const slope = ((y1 - y2) * time * 10 ** 18) / (x2 - x1)
+    let price = (b - slope) / 10 ** 18
 
     if (time <= 0) {
       price = initialPrice
@@ -247,9 +266,6 @@ contract('LANDAuction', function([
       kyberConverter.address,
       fromOwner
     )
-    // Start auction
-    await landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromOwner)
-    initialTime = getBlockchainTime()
 
     // Assign balance to bidders and allow LANDAuction to move MANA
     await manaToken.setBalance(web3.toWei(1000000, 'ether'), fromBidder)
@@ -302,6 +318,14 @@ contract('LANDAuction', function([
       web3.toWei(3000000000000, 'ether'),
       fromAnotherBidder
     )
+
+    // Start auction
+    const { logs } = await landAuction.startAuction(
+      landsLimitPerBid,
+      gasPriceLimit,
+      fromOwner
+    )
+    initialTime = logs[2].args._time
   })
 
   describe('constructor', function() {
@@ -632,15 +656,14 @@ contract('LANDAuction', function([
   })
 
   describe('getCurrentPrice', function() {
-    // it('should get current price', async function() {
-    //   for (let i = 0; i < 50; i++) {
-    //     let oldPrice = await getCurrentPrice()
-    //     console.log(oldPrice)
-    //     await increaseTime(duration.hours(12))
-    //   }
-    // })
-    //@nacho: TODO revisit this
-    it('should get current price', async function() {
+    it('should match desire prices', async function() {
+      for (let i = 0; i < 20; i++) {
+        const price = await landAuction.getPrice(duration.days(i))
+        weiToDecimal(price).should.be.equal(weiToDecimal(PRICES[i] || endPrice))
+      }
+    })
+
+    it.only('should get current price', async function() {
       // Day 0
       let oldPrice = await getCurrentPrice()
       let price = oldPrice
@@ -650,24 +673,24 @@ contract('LANDAuction', function([
       // Day 5
       await increaseTime(duration.days(5))
       price = await getCurrentPrice()
-      time = getBlockchainTime()
       price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
       price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
       oldPrice = price
 
       // Day 14
-      await increaseTime(duration.days(9))
+      await increaseTime(duration.days(8))
       price = await getCurrentPrice()
-      time = getBlockchainTime()
       price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
       price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
       oldPrice = price
 
       // Day 14 and 10 hours
       await increaseTime(duration.hours(10))
       price = await getCurrentPrice()
-      time = getBlockchainTime()
       price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
       price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
     })
 
@@ -1006,7 +1029,6 @@ contract('LANDAuction', function([
       // Check reserve of kyber and balance of bidder
       const kyberDCLBalance = await dclToken.balanceOf(kyberMock.address)
       const bidderDCLBalance = await dclToken.balanceOf(bidder)
-      console.log(bidderDCLPrevBalance.toString(), bidderDCLBalance.toString())
       kyberDCLBalance.should.be.bignumber.gt(0)
       kyberDCLBalance.should.be.bignumber.equal(
         bidderDCLPrevBalance.minus(bidderDCLBalance)
