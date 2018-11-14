@@ -469,19 +469,18 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
-        // Set Dai charity
         require(
             address(_daiCharity).isContract(),
             "The DAI Charity token address must be a deployed contract"
         );
         daiCharity = _daiCharity;
 
-        // Set token killer
         require(
             address(_tokenKiller).isContract(),
             "The Token Killer must be a deployed contract"
         );
         tokenKiller = _tokenKiller;
+
 
         setDex(_dex);
 
@@ -646,6 +645,69 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             }
             return _getPrice(timePassed);
         }
+    }
+
+    /**
+    * @dev Make a bid for LANDs
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function bid(
+        int[] _xs, 
+        int[] _ys, 
+        address _beneficiary, 
+        ERC20 _fromToken
+    ) external whenNotPaused 
+    {
+        require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
+        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
+        require(_xs.length > 0, "You should bid to at least one LAND");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
+        require(tokensAllowed[address(_fromToken)], "token not accepted");
+
+        uint256 currentPrice = getCurrentPrice();
+        uint256 totalPrice = _xs.length.mul(currentPrice);
+
+        if (address(_fromToken) != address(manaToken)) {
+            require(
+                address(dex).isContract(), 
+                "Pay with other token than MANA is not available"
+            );
+            // Convert _fromToken to MANA
+            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+        } else {
+            // Transfer MANA to LANDAuction contract
+            require(
+                _fromToken.transferFrom(msg.sender, address(this), totalPrice),
+                "Transfering the totalPrice to LANDAuction contract failed"
+            );
+        }
+
+        // Assign LANDs to _beneficiary
+        for (uint i = 0; i < _xs.length; i++) {
+            int x = _xs[i];
+            int y = _ys[i];
+            require(
+                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+        }
+        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
+
+
+        emit BidSuccessful(
+            _beneficiary,
+            _fromToken,
+            currentPrice,
+            totalPrice,
+            _xs,
+            _ys
+        );
     }
 
     /**
@@ -922,7 +984,81 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         _burnToken(_bidId, manaToken);       
     }
 
-    
+    /** 
+    * @dev Create a combined function.
+    * note that we will set N - 1 function combinations based on N points (x,y)
+    * @param _xPoints - uint256[] of x values
+    * @param _yPoints - uint256[] of y values
+    */
+    function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
+        uint256 pointsLength = _xPoints.length;
+        require(pointsLength == _yPoints.length, "Points should have the same length");
+        for (uint i = 0; i < pointsLength - 1; i++) {
+            uint256 x1 = _xPoints[i];
+            uint256 x2 = _xPoints[i + 1];
+            uint256 y1 = _yPoints[i];
+            uint256 y2 = _yPoints[i + 1];
+            require(x1 < x2, "X points should increase");
+            require(y1 > y2, "Y points should decrease");
+            (uint256 base, uint256 slope) = _getFunc(
+                x1, 
+                x2, 
+                y1, 
+                y2
+            );
+            curves.push(Func({
+                base: base,
+                slope: slope,
+                limit: x2
+            }));
+        }
+
+        initialPrice = _yPoints[0];
+        endPrice = _yPoints[pointsLength - 1];
+    }
+
+    /**
+    * @dev LAND price based on time
+    * Note that will select the function to calculate based on the time
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256) {
+        for (uint i = 0; i < curves.length; i++) {
+            Func memory func = curves[i];
+            if (_time < func.limit) {
+                return func.base.sub(func.slope.mul(_time));
+            }
+        }
+        revert("Invalid time");
+    }
+
+    /**
+    * @dev Calculate base and slope for the given points
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * As we want to avoid negative numbers in favor of using uints we use it as: y = b - ax
+    * Based on two points (x1; x2) and (y1; y2)
+    * base = (x2 * y1) - (x1 * y2) / x2 - x1
+    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
+    * @param _x1 - uint256 x1 value
+    * @param _x2 - uint256 x2 value
+    * @param _y1 - uint256 y1 value
+    * @param _y2 - uint256 y2 value
+    * @return uint256 for the base
+    * @return uint256 for the slope
+    */
+    function _getFunc(
+        uint256 _x1,
+        uint256 _x2,
+        uint256 _y1, 
+        uint256 _y2
+    ) internal pure returns (uint256 base, uint256 slope) 
+    {
+        base = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
+        slope = (_y1.sub(_y2)).div(_x2.sub(_x1));
+    }
+
     /** 
     * @dev Burn tokens. 
     * Note that if the token is the DAI token we will transfer the funds 
@@ -935,7 +1071,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _burnToken(uint256 _bidId, ERC20 _token) private {
         uint256 balance = _token.balanceOf(address(this));
 
-        if(_token == daiToken) {
+        // Check if balance is valid
+        require(balance > 0, "Balance to burn should be > 0");
+
+        if (_token == daiToken) {
             // Transfer to DAI charity if token to burn is DAI
             require(
                 _token.transfer(daiCharity, balance),
@@ -975,7 +1114,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ));        
     }
 
-    /** 
+    /**
     * @dev Return bid id
     * @return uint256 of the bid id
     */
@@ -1006,12 +1145,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             uint256 y2 = _yPoints[i + 1];
             require(x1 < x2, "X points should increase");
             require(y1 > y2, "Y points should decrease");
-            (uint256 base, uint256 slope) = _getFunc(
-                x1, 
-                x2, 
-                y1, 
-                y2
-            );
+            (uint256 base, uint256 slope) = _getFunc(x1, x2, y1, y2);
             curves.push(Func({
                 base: base,
                 slope: slope,
@@ -1022,6 +1156,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         initialPrice = _yPoints[0];
         endPrice = _yPoints[pointsLength - 1];
     }
+
 
     /**
     * @dev LAND price based on time
