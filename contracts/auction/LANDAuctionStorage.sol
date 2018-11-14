@@ -82,8 +82,9 @@ contract LANDAuctionStorage {
       uint256 _price
     );
 
-    event MANABurned(
+    event TokenBurned(
       address indexed _caller,
+      address indexed _token,
       uint256 _total
     );
 

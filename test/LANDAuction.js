@@ -9,6 +9,7 @@ require('chai')
 
 const LANDAuction = artifacts.require('LANDAuction')
 const ERC20Token = artifacts.require('ERC20Test')
+const ERC20WithoutBurn = artifacts.require('ERC20WithoutBurn')
 const AssetRegistryToken = artifacts.require('AssetRegistryTest')
 const KyberConverter = artifacts.require('KyberConverter.sol')
 const KyberMock = artifacts.require('KyberMock.sol')
@@ -160,7 +161,7 @@ contract('LANDAuction', function([
     // Create tokens
     manaToken = await ERC20Token.new(creationParams)
     nchToken = await ERC20Token.new(creationParams)
-    dclToken = await ERC20Token.new(creationParams)
+    dclToken = await ERC20WithoutBurn.new(creationParams)
     landRegistry = await AssetRegistryToken.new(creationParams)
 
     // create KyberMock
@@ -1173,19 +1174,57 @@ contract('LANDAuction', function([
       })
       const price = await getCurrentPrice()
       await landAuction.finishAuction(fromOwner)
-      const { logs } = await landAuction.burnFunds(fromOwner)
 
+      const prevBalance = await manaToken.balanceOf(landAuction.address)
+      prevBalance.should.be.bignumber.gt(0)
+
+      const { logs } = await landAuction.burnFunds(manaToken.address, fromOwner)
       logs.length.should.be.equal(1)
 
       assertEvent(
         normalizeEvent(logs[0]),
-        'MANABurned',
+        'TokenBurned',
         {
           _caller: owner,
+          _token: manaToken.address,
           _total: (price * xs.length).toString()
         },
         true
       )
+
+      const balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+    })
+
+    it('should burn no-MANA token', async function() {
+      await landAuction.allowManyTokens(
+        [nchToken.address],
+        [MAX_DECIMALS],
+        [true],
+        fromOwner
+      )
+
+      // Bid
+      await landAuction.bid(xs, ys, bidder, nchToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+      await landAuction.finishAuction(fromOwner)
+
+      const prevNCHBalance = await nchToken.balanceOf(landAuction.address)
+      prevNCHBalance.should.be.bignumber.gt(0)
+
+      const prevMANABalance = await manaToken.balanceOf(landAuction.address)
+      prevMANABalance.should.be.bignumber.gt(0)
+
+      await landAuction.burnFunds(nchToken.address, fromOwner)
+      await landAuction.burnFunds(manaToken.address, fromOwner)
+
+      const nchBalance = await nchToken.balanceOf(landAuction.address)
+      nchBalance.should.be.bignumber.equal(0)
+
+      const manaBalance = await manaToken.balanceOf(landAuction.address)
+      manaBalance.should.be.bignumber.equal(0)
     })
 
     it('should execute burnFunds called by another user ', async function() {
@@ -1195,16 +1234,67 @@ contract('LANDAuction', function([
         gasPrice: gasPriceLimit
       })
       await landAuction.finishAuction(fromOwner)
-      await landAuction.burnFunds(fromHacker)
+      await landAuction.burnFunds(manaToken.address, fromHacker)
+    })
+
+    it('reverts if token does not implement burn', async function() {
+      await landAuction.allowManyTokens(
+        [dclToken.address],
+        [SPECIAL_DECIMALS],
+        [true],
+        fromOwner
+      )
+
+      // Bid
+      await landAuction.bid(xs, ys, bidder, dclToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      await landAuction.finishAuction(fromOwner)
+
+      const prevBalance = await dclToken.balanceOf(landAuction.address)
+      prevBalance.should.be.bignumber.gt(0)
+
+      const prevMANABalance = await manaToken.balanceOf(landAuction.address)
+      prevMANABalance.should.be.bignumber.gt(0)
+
+      await assertRevert(landAuction.burnFunds(dclToken.address, fromOwner))
+      await landAuction.burnFunds(manaToken.address, fromOwner)
+
+      const balance = await dclToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(prevBalance)
+
+      const manaBalance = await manaToken.balanceOf(landAuction.address)
+      manaBalance.should.be.bignumber.equal(0)
     })
 
     it('reverts when trying to burn 0 funds', async function() {
       await landAuction.finishAuction(fromOwner)
-      await assertRevert(landAuction.burnFunds(fromOwner))
+      await assertRevert(landAuction.burnFunds(manaToken.address, fromOwner))
+    })
+
+    it('reverts when trying to burn twice funds', async function() {
+      await increaseTime(duration.days(3))
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      await landAuction.finishAuction(fromOwner)
+
+      const prevBalance = await manaToken.balanceOf(landAuction.address)
+      prevBalance.should.be.bignumber.gt(0)
+
+      await landAuction.burnFunds(manaToken.address, fromOwner)
+
+      const balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+      await assertRevert(landAuction.burnFunds(manaToken.address, fromOwner))
     })
 
     it('reverts when trying to burn before finished', async function() {
-      await assertRevert(landAuction.burnFunds(fromOwner))
+      await assertRevert(landAuction.burnFunds(manaToken.address, fromOwner))
     })
   })
 

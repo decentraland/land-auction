@@ -380,8 +380,9 @@ contract LANDAuctionStorage {
       uint256 _price
     );
 
-    event MANABurned(
+    event TokenBurned(
       address indexed _caller,
+      address indexed _token,
       uint256 _total
     );
 
@@ -501,19 +502,26 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Burn the MANA earned by the auction
     */
-    function burnFunds() external {
+    function burnFunds(ERC20 _token) external {
         require(
             status == Status.finished,
             "Burn should be performed when the auction is finished"
         );
-        uint256 balance = manaToken.balanceOf(address(this));
+        require(
+            address(_token).isContract(),
+            "_from token should be a contract"
+        );
+
+        uint256 balance = _token.balanceOf(address(this));
+
         require(
             balance > 0,
-            "No MANA to burn"
+            "No tokens left to burn"
         );
-        manaToken.burn(balance);
 
-        emit MANABurned(msg.sender, balance);
+        // Burn tokens
+        _safeBurn(_token, balance);
+        emit TokenBurned(msg.sender, address(_token), balance);
     }
 
     /**
@@ -837,5 +845,24 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
         require(_xs.length == _ys.length, "X values length should be equal to Y values length");
         require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
+    }
+
+    /** 
+    * @dev Execute burn method. 
+    * Note that if the contract does not implement it will revert
+    * @param _token - ERC20 token
+    * @param _amount - uint256 of the amount to burn
+    */
+    function _safeBurn(ERC20 _token, uint256 _amount) internal {
+        // keep at least %0.1 of the block gas limit used to emit the Burn event
+        uint256 _gas = block.gaslimit.sub(block.gaslimit.div(10000)); 
+        _gas = gasleft() < _gas ? gasleft() : _gas;
+        require(
+            address(_token).call.gas(_gas)(abi.encodeWithSelector(
+                _token.burn.selector,
+                _amount
+            )), 
+            "Burn can not be performed for this token"
+        );        
     }
 }
