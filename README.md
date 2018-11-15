@@ -50,6 +50,7 @@ contract LANDAuctionStorage {
       address indexed _token,
       uint256 _totalPriceInMana,
       uint256 _totalPriceInToken,
+      uint256 _change,
       uint256 _tokensKept
     );
 
@@ -227,13 +228,26 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function disableToken(address _address) public onlyOwner;
 
     /**
+    * @dev Get exchange rate
+    * @param _srcToken - IERC20 token
+    * @param _destToken - IERC20 token
+    * @param _srcAmount - uint256 amount to be converted
+    * @return uint256 of the rate
+    */
+    function getRate(
+        IERC20 _srcToken,
+        IERC20 _destToken,
+        uint256 _srcAmount
+    ) public returns (uint256 rate)
+
+    /**
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
     * Note that we will use the slippageRate cause it has a 3% buffer
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return bool to confirm the convertion was successfully
     */
-    function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
+    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
 
     /**
     * @dev Validate bid function params
@@ -242,12 +256,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _beneficiary - address beneficiary for the LANDs to bid
     * @param _fromToken - token used to bid
     */
-    function validateBidParameters(
+    function _validateBidParameters(
         int[] _xs,
         int[] _ys,
         address _beneficiary,
         ERC20 _fromToken
     ) internal view;
+
+    /**
+    * @dev Execute burn method.
+    * Note that if the contract does not implement it will revert
+    * @param _token - ERC20 token
+    * @param _amount - uint256 of the amount to burn
+    */
+    function _safeBurn(ERC20 _token, uint256 _amount) internal;
 
 }
 ```

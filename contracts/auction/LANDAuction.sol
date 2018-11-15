@@ -137,7 +137,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) external whenNotPaused 
     {
-        validateBidParameters(
+        _validateBidParameters(
             _xs, 
             _ys, 
             _beneficiary, 
@@ -153,7 +153,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            totalPrice = convertSafe(totalBids, _fromToken, totalPrice);
+            totalPrice = _convertSafe(totalBids, _fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -314,6 +314,22 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
+    * @dev Get exchange rate
+    * @param _srcToken - IERC20 token
+    * @param _destToken - IERC20 token 
+    * @param _srcAmount - uint256 amount to be converted
+    * @return uint256 of the rate
+    */
+    function getRate(
+        IERC20 _srcToken, 
+        IERC20 _destToken, 
+        uint256 _srcAmount
+    ) public returns (uint256 rate) 
+    {
+        (, rate) = dex.getExpectedRate(_srcToken, _destToken, _srcAmount);
+    }
+
+    /**
     * @dev Calculate LAND price based on time
     * It is a linear function y = ax - b. But The slope should be negative.
     * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
@@ -337,7 +353,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
-    function convertSafe(
+    function _convertSafe(
         uint256 bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
@@ -348,8 +364,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 prevBalance = manaToken.balanceOf(address(this));
 
         // Get rate
-        uint256 tokenRate;
-        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, totalPrice);
+        uint256 tokenRate = getRate(manaToken, _fromToken, totalPrice);
 
         // Calculate the amount of _fromToken needed
         uint256 totalPriceInToken = totalPrice.mul(tokenRate).div(10 ** 18);
@@ -402,8 +417,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
 
        // Return change in MANA to sender
+        uint256 change = 0;
         if (bought > totalPrice) {
-            uint256 change = bought.sub(totalPrice);
+            change = bought.sub(totalPrice);
             require(
                 manaToken.transfer(msg.sender, change),
                 "Transfering the change to sender failed"
@@ -418,6 +434,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             address(_fromToken),
             totalPrice,
             totalPriceInToken,
+            change,
             tokensKept
         );
     }
@@ -429,7 +446,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _beneficiary - address beneficiary for the LANDs to bid
     * @param _fromToken - token used to bid
     */
-    function validateBidParameters(
+    function _validateBidParameters(
         int[] _xs, 
         int[] _ys, 
         address _beneficiary, 
