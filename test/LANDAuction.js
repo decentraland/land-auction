@@ -24,6 +24,7 @@ const MAX_DECIMALS = 18
 const SPECIAL_DECIMALS = 12
 
 const PERCENTAGE_OF_TOKEN_TO_KEEP = 0.05
+const CONVERTION_FEE = 105
 
 function getBlockchainTime(blockNumber = 'latest') {
   return web3.eth.getBlock(blockNumber).timestamp
@@ -1526,6 +1527,45 @@ contract('LANDAuction', function([
       await assertRevert(
         landAuction.disableToken(manaToken.address, fromHacker)
       )
+    })
+  })
+
+  describe('setConvertionFee', function() {
+    it('should change convertion fee', async function() {
+      let convertionFee = await landAuction.convertionFee()
+      convertionFee.should.be.bignumber.equal(CONVERTION_FEE)
+
+      const { logs } = await landAuction.setConvertionFee(110, fromOwner)
+      assertEvent(
+        normalizeEvent(logs[0]),
+        'ConvertionFeeChanged',
+        {
+          _caller: owner,
+          _oldConvertionFee: CONVERTION_FEE.toString(),
+          _convertionFee: '110'
+        },
+        true
+      )
+
+      convertionFee = await landAuction.convertionFee()
+      convertionFee.should.be.bignumber.equal(110)
+
+      await landAuction.setConvertionFee(100, fromOwner)
+
+      convertionFee = await landAuction.convertionFee()
+      convertionFee.should.be.bignumber.equal(100)
+    })
+
+    it('reverts when changing to less than 100', async function() {
+      await assertRevert(landAuction.setConvertionFee(99, fromOwner))
+    })
+
+    it('reverts when changing to > 199', async function() {
+      await assertRevert(landAuction.setConvertionFee(200, fromOwner))
+    })
+
+    it('reverts when no-owner trying to change it', async function() {
+      await assertRevert(landAuction.setConvertionFee(110, fromHacker))
     })
   })
 })

@@ -212,6 +212,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _fee - uint256 for the new convertion rate
     */
     function setConvertionFee(uint256 _fee) external onlyOwner {
+        require(_fee < 200 && _fee >= 100, "Convertion fee should be >= 100 and < 200");
         emit ConvertionFeeChanged(msg.sender, convertionFee, _fee);
         convertionFee = _fee;
     }
@@ -511,10 +512,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _amount - uint256 of the amount to burn
     */
     function _safeBurn(ERC20 _token, uint256 _amount) internal {
-        // keep at least 30000 to emit the burn event
-        uint256 _gas = gasleft() - 3000;
         require(
-            address(_token).call.gas(_gas)(abi.encodeWithSelector(
+            address(_token).call(abi.encodeWithSelector(
                 _token.burn.selector,
                 _amount
             )), 
