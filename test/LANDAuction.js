@@ -101,6 +101,7 @@ contract('LANDAuction', function([
   bidder,
   anotherBidder,
   bidderWithoutFunds,
+  bidderWithOnlyNCH,
   hacker
 ]) {
   const initialPrice = web3.toWei(0.5, 'ether')
@@ -126,6 +127,7 @@ contract('LANDAuction', function([
   const fromBidder = { from: bidder }
   const fromAnotherBidder = { from: anotherBidder }
   const fromBidderWithoutFunds = { from: bidderWithoutFunds }
+  const fromBidderWithOnlyNCH = { from: bidderWithOnlyNCH }
   const fromHacker = { from: hacker }
 
   const creationParams = {
@@ -208,6 +210,7 @@ contract('LANDAuction', function([
     // Supply bidders with other erc20 tokens and approve landAuction
     await nchToken.setBalance(web3.toWei(10, 'ether'), fromBidder)
     await nchToken.setBalance(web3.toWei(10, 'ether'), fromAnotherBidder)
+    await nchToken.setBalance(web3.toWei(10, 'ether'), fromBidderWithOnlyNCH)
     await dclToken.setBalance(web3.toWei(10000000, 'Mwei'), fromBidder) // 10 ether cause it is 12 decimals contract
     await dclToken.setBalance(web3.toWei(10000000, 'Mwei'), fromAnotherBidder) // 10 ether cause it is 12 decimals contract
     await nchToken.approve(
@@ -219,6 +222,11 @@ contract('LANDAuction', function([
       landAuction.address,
       web3.toWei(10, 'ether'),
       fromAnotherBidder
+    )
+    await nchToken.approve(
+      landAuction.address,
+      web3.toWei(10, 'ether'),
+      fromBidderWithOnlyNCH
     )
     await dclToken.approve(
       landAuction.address,
@@ -782,13 +790,19 @@ contract('LANDAuction', function([
       )
 
       // Get prev balance of bidder of NCH token
-      const bidderNCHPrevBalance = await nchToken.balanceOf(bidder)
+      const bidderNCHPrevBalance = await nchToken.balanceOf(bidderWithOnlyNCH)
 
       // Bid
-      const { logs } = await landAuction.bid(xs, ys, bidder, nchToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
+      const { logs } = await landAuction.bid(
+        xs,
+        ys,
+        bidderWithOnlyNCH,
+        nchToken.address,
+        {
+          ...fromBidderWithOnlyNCH,
+          gasPrice: gasPriceLimit
+        }
+      )
 
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
@@ -820,7 +834,7 @@ contract('LANDAuction', function([
         'BidSuccessful',
         {
           _bidId: '0',
-          _beneficiary: bidder,
+          _beneficiary: bidderWithOnlyNCH,
           _token: nchToken.address,
           _price: price.toString(),
           _totalPrice: totalPrice.toString(),
@@ -834,20 +848,27 @@ contract('LANDAuction', function([
       for (let i = 0; i < xs.length; i++) {
         const id = await landRegistry._encodeTokenId(xs[i], ys[i])
         const address = await landRegistry.ownerOf(id)
-        address.should.be.equal(bidder)
+        address.should.be.equal(bidderWithOnlyNCH)
       }
 
       // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(logs[0].args._totalPriceInMana)
 
-      // Check reserve of kyber and balance of bidder
+      // Check reserve of kyber and balance of bidderWithOnlyNCH
       const kyberNCHBalance = await nchToken.balanceOf(kyberMock.address)
-      const bidderNCHBalance = await nchToken.balanceOf(bidder)
+      const bidderWithOnlyNCHBalance = await nchToken.balanceOf(
+        bidderWithOnlyNCH
+      )
       kyberNCHBalance.should.be.bignumber.gt(0)
       kyberNCHBalance.should.be.bignumber.equal(
-        bidderNCHPrevBalance.minus(bidderNCHBalance)
+        bidderNCHPrevBalance.minus(bidderWithOnlyNCHBalance)
       )
+
+      const manaBalanceOfBidderWithOnlyNCHBalance = await manaToken.balanceOf(
+        bidderWithOnlyNCHBalance
+      )
+      manaBalanceOfBidderWithOnlyNCHBalance.should.be.bignumber.equal(0)
     })
 
     it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
