@@ -283,8 +283,8 @@ contract ITokenConverter {
         IERC20 _srcToken,
         IERC20 _destToken,
         uint256 _srcAmount,
-        uint256 _minReturn
-        ) external payable returns (uint256 amount);
+        uint256 _destAmount
+        ) external payable returns (bool);
 
     /**
     * @dev Get exchange rate and slippage rate. 
@@ -330,6 +330,7 @@ contract LANDAuctionStorage {
         bool isAllowed;
     }
 
+    uint256 public convertionFee = 105;
     uint256 public totalBids = 0;
     Status public status;
     uint256 public gasPriceLimit;
@@ -414,6 +415,12 @@ contract LANDAuctionStorage {
     event TokenDisabled(
       address indexed _caller,
       address indexed _address
+    );
+
+    event ConvertionFeeChanged(
+      address indexed _caller,
+      uint256 _oldConvertionFee,
+      uint256 _convertionFee
     );
 }
 
@@ -538,7 +545,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) external 
     {
-        validateBidParameters(
+        _validateBidParameters(
             _xs, 
             _ys, 
             _beneficiary, 
@@ -554,7 +561,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            totalPrice = convertSafe(totalBids, _fromToken, totalPrice);
+            totalPrice = _convertSafe(totalBids, _fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -606,6 +613,15 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         for (uint i = 0; i < _address.length; i++) {
             allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
         }
+    }
+
+    /**
+    * @dev Set convertion fee rate
+    * @param _fee - uint256 for the new convertion rate
+    */
+    function setConvertionFee(uint256 _fee) external onlyOwner {
+        emit ConvertionFeeChanged(msg.sender, convertionFee, _fee);
+        convertionFee = _fee;
     }
 
     /**
@@ -715,6 +731,22 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
+    * @dev Get exchange rate
+    * @param _srcToken - IERC20 token
+    * @param _destToken - IERC20 token 
+    * @param _srcAmount - uint256 amount to be converted
+    * @return uint256 of the rate
+    */
+    function getRate(
+        IERC20 _srcToken, 
+        IERC20 _destToken, 
+        uint256 _srcAmount
+    ) public view returns (uint256 rate) 
+    {
+        (, rate) = dex.getExpectedRate(_srcToken, _destToken, _srcAmount);
+    }
+
+    /**
     * @dev Calculate LAND price based on time
     * It is a linear function y = ax - b. But The slope should be negative.
     * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
@@ -733,80 +765,73 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
-    * Note that we will use the slippageRate cause it has a 3% buffer
+    * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
+    * the convertion fee.
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
-    function convertSafe(
+    function _convertSafe(
         uint256 bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
     ) internal returns (uint256 totalPrice)
     {
         totalPrice = _totalPrice;
-        // Save the current MANA balance of the contract
-        uint256 prevBalance = manaToken.balanceOf(address(this));
+        Token memory fromToken = tokensAllowed[address(_fromToken)];
+
+        uint totalPriceWithDeposit = totalPrice.mul(convertionFee).div(100);
+
+        // Save prev _fromToken balance 
+        uint256 prevTokenBalance = _fromToken.balanceOf(address(this));
 
         // Get rate
-        uint256 tokenRate;
-        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, totalPrice);
+        uint256 tokenRate = getRate(manaToken, _fromToken, totalPriceWithDeposit);
+
+        // Check if contract should keep a percentage of _fromToken
+        uint256 tokensToKeep = 0;
+        if (fromToken.shouldKeepToken) {
+            (tokensToKeep, totalPrice) = _calculateTokensToKeep(totalPrice, tokenRate);
+        }
 
         // Calculate the amount of _fromToken needed
-        uint256 totalPriceInToken = totalPrice.mul(tokenRate).div(10 ** 18);
+        uint256 totalPriceInToken = totalPriceWithDeposit.mul(tokenRate).div(10 ** 18);
 
-        // Normalize to _fromToken decimals and calculate the amount of tokens to convert
-        Token memory fromToken = tokensAllowed[address(_fromToken)];
+        // Normalize to _fromToken decimals
         if (MAX_DECIMALS > fromToken.decimals) {
-           
-            uint256 priceInToken = totalPriceInToken.div(10**(MAX_DECIMALS - fromToken.decimals));
-
-            // Solidity always truncate the result. if division has a remainder, we should
-            // increase 1 wei to ensure the price in MANA 
-            if (totalPriceInToken.mod(10**(MAX_DECIMALS - fromToken.decimals)) > 0) {
-                totalPriceInToken = priceInToken.add(1);
-            } else {
-                totalPriceInToken = priceInToken;
-            }
-        }
+            (tokensToKeep, totalPriceInToken) = _normalizeDecimals(
+                fromToken.decimals, 
+                tokensToKeep, 
+                totalPriceInToken
+            );
+         }
 
         // Transfer _fromToken amount from sender to the contract
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
-
-        // Check if contract should keep a percentage of _fromToken
-        uint256 tokensKept = 0;
-        if (fromToken.shouldKeepToken) {
-            // Should keep a percentage of the token
-            // PERCENTAGE_OF_TOKEN_TO_KEEP will always be less than 100
-            tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
-            totalPrice = totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
-        }
         
         // Approve amount of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
         // Convert _fromToken to MANA
-        uint256 bought = dex.convert(
+        require(
+            dex.convert(
                 _fromToken,
                 manaToken,
-                totalPriceInToken - tokensKept,
+                totalPriceInToken,
                 totalPrice
-            );
-        
-        // Check the amount of MANA bought
-        require(
-            manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
-            "Bought amount incorrect"
+            ), 
+            "Could not convert tokens"
         );
 
-       // Return change in MANA to sender
-        if (bought > totalPrice) {
-            uint256 change = bought.sub(totalPrice);
+       // Return change in _fromToken to sender
+        uint256 change = _fromToken.balanceOf(address(this)) - prevTokenBalance - tokensToKeep;
+        if (change > 0) {
+            // Return the change of src token
             require(
-                manaToken.transfer(msg.sender, change),
+                _fromToken.transfer(msg.sender, change),
                 "Transfering the change to sender failed"
             );
         }
@@ -818,9 +843,49 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             bidId,
             address(_fromToken),
             totalPrice,
-            totalPriceInToken,
-            tokensKept
+            totalPriceInToken - change,
+            tokensToKeep
         );
+    }
+
+    /** 
+    * @dev Calculate the amount of tokens to keep and the total price in MANA
+    * Note that PERCENTAGE_OF_TOKEN_TO_KEEP will be always less than 100
+    * @param _totalPrice - uint256 price to calculate percentage to keep
+    * @param _tokenRate - rate to calculate the amount of tokens
+    * @return tokensToKeep - uint256 of the amount of tokens to keep
+    * @return totalPrice - uint256 of the new total price in MANA
+    */
+    function _calculateTokensToKeep(uint256 _totalPrice, uint256 _tokenRate) 
+    internal pure returns (uint256 tokensToKeep, uint256 totalPrice) 
+    {
+        tokensToKeep = _totalPrice.mul(_tokenRate)
+            .div(10 ** 18)
+            .mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+            .div(100);
+            
+        totalPrice = _totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+    }
+
+    /** 
+    * @dev Normalize to _fromToken decimals
+    * @param _decimals - uint256 of _fromToken decimals
+    * @param _tokensToKeep - uint256 of the amount of tokens to keep
+    * @param _totalPriceInToken - uint256 of the amount of _fromToken
+    * @return tokensToKeep - uint256 of the amount of tokens to keep in _fromToken decimals
+    * @return totalPriceInToken - address beneficiary for the LANDs to bid in _fromToken decimals
+    */
+    function _normalizeDecimals(
+        uint256 _decimals, 
+        uint256 _tokensToKeep, 
+        uint256 _totalPriceInToken
+    ) 
+    internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken) 
+    {
+        uint256 newDecimals = 10**MAX_DECIMALS.sub(_decimals);
+
+        totalPriceInToken = _totalPriceInToken.div(newDecimals);
+        tokensToKeep = _tokensToKeep.div(newDecimals);
     }
 
     /** 
@@ -830,7 +895,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _beneficiary - address beneficiary for the LANDs to bid
     * @param _fromToken - token used to bid
     */
-    function validateBidParameters(
+    function _validateBidParameters(
         int[] _xs, 
         int[] _ys, 
         address _beneficiary, 
@@ -854,9 +919,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _amount - uint256 of the amount to burn
     */
     function _safeBurn(ERC20 _token, uint256 _amount) internal {
-        // keep at least %0.1 of the block gas limit used to emit the Burn event
-        uint256 _gas = block.gaslimit.sub(block.gaslimit.div(10000)); 
-        _gas = gasleft() < _gas ? gasleft() : _gas;
+        // keep at least 30000 to emit the burn event
+        uint256 _gas = gasleft() - 3000;
         require(
             address(_token).call.gas(_gas)(abi.encodeWithSelector(
                 _token.burn.selector,

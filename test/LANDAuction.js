@@ -874,11 +874,11 @@ contract('LANDAuction', function([
 
       // add 1 cause we do the same in the contract to ensure the min MANA to buy
       // when dealing with tokens with less decimals than MANA
-      const totalPriceInToken = (await kyberMock.getReturn(
+      const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
         logs[0].args._totalPriceInMana
-      )).add(1)
+      )
 
       logs.length.should.be.equal(2)
 
@@ -925,7 +925,7 @@ contract('LANDAuction', function([
 
       // Mana of bidder should keep the same or increase
       const bidderMANABalance = await manaToken.balanceOf(bidder)
-      bidderMANABalance.should.be.bignumber.gt(web3.toWei(10, 'ether'))
+      bidderMANABalance.should.be.bignumber.gte(web3.toWei(10, 'ether'))
     })
 
     it('should bid with less gas Price', async function() {
@@ -973,9 +973,7 @@ contract('LANDAuction', function([
         logs[1].args._price.mul(xs.length)
       )
       // Keep 5% percentage of the token
-      const tokensKept = totalPriceInToken
-        .mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
-        .toFixed(0) // remove decimal
+      const tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
 
       logs.length.should.be.equal(2)
 
@@ -987,7 +985,7 @@ contract('LANDAuction', function([
           _token: nchToken.address,
           _totalPriceInMana: totalPrice.toString(),
           _totalPriceInToken: totalPriceInToken.toString(),
-          _tokensKept: tokensKept.toString()
+          _tokensKept: tokensKept.toFixed(0) // remove decimal
         },
         true
       )

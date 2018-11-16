@@ -263,6 +263,24 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) internal view;
 
+    function _calculateTokensToKeep(uint256 _totalPrice, uint256 _tokenRate)
+    internal pure returns (uint256 tokensToKeep, uint256 totalPrice);
+
+    /**
+    * @dev Normalize to _fromToken decimals
+    * @param _decimals - uint256 of _fromToken decimals
+    * @param _tokensToKeep - uint256 of the amount of tokens to keep
+    * @param _totalPriceInToken - uint256 of the amount of _fromToken
+    * @return tokensToKeep - uint256 of the amount of tokens to keep in _fromToken decimals
+    * @return totalPriceInToken - address beneficiary for the LANDs to bid in _fromToken decimals
+    */
+    function _normalizeDecimals(
+        uint256 _decimals,
+        uint256 _tokensToKeep,
+        uint256 _totalPriceInToken
+    )
+    internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken);
+
     /**
     * @dev Execute burn method.
     * Note that if the contract does not implement it will revert

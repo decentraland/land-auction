@@ -22,15 +22,19 @@ contract KyberConverter is ITokenConverter {
         IERC20 _srcToken,
         IERC20 _destToken,
         uint256 _srcAmount,
-        uint256 _minReturn
+        uint256 _destAmount
     ) 
-    external payable returns (uint256 amount) 
+    external payable returns (bool)
     {
+        // Save prev src token balance 
+        uint256 prevSrcBalance = _srcToken.balanceOf(address(this));
+
         // Transfer tokens to be converted from msg.sender to this contract
         require(
             _srcToken.transferFrom(msg.sender, address(this), _srcAmount),
             "Could not transfer _srcToken to this contract"
         );
+
         // Approve Kyber to use _srcToken on belhalf of this contract
         require(
             _srcToken.approve(kyber, _srcAmount),
@@ -38,30 +42,43 @@ contract KyberConverter is ITokenConverter {
         );
 
         uint256 minRate;
-        (, minRate) = getExpectedRate(_srcToken, _destToken, _minReturn);
+        (, minRate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
 
         // Trade _srcAmount from _srcToken to _destToken
-        amount = kyber.trade(
+        uint256 amount = kyber.trade(
             _srcToken,
             _srcAmount,
             _destToken,
             address(this),
-            MAX_UINT,
+            _destAmount,
             minRate,
             walletId
         );
+        
         // Clean kyber to use _srcTokens on belhalf of this contract
         require(
             _srcToken.approve(kyber, 0),
             "Could not clean approval of kyber to use _srcToken on behalf of this contract"
         );
-        // Check if the amount traded is greater or equal to the minimum required
-        require(amount >= _minReturn, "Min return not reached");
-        // Transfer amount of _destTokens to msf.sender
+
+        // Check if the amount traded is equal to the expected one
+        require(amount == _destAmount, "Amount bought is not equal to dest amount");
+
+        // Return the change of src token
+        uint256 change = _srcToken.balanceOf(address(this)) - prevSrcBalance;
+        require(
+            _srcToken.transfer(msg.sender, change),
+            "Could not transfer change to sender"
+        );
+
+
+        // Transfer amount of _destTokens to msg.sender
         require(
             _destToken.transfer(msg.sender, amount),
             "Could not transfer amount of _destToken to msg.sender"
         );
+
+        return true;
     }
 
     function getExpectedRate(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 
