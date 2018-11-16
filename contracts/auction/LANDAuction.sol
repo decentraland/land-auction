@@ -36,9 +36,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
-        if (_dex != address(0)) {
-            setDex(_dex);
-        }
+        setDex(_dex);
 
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
@@ -264,7 +262,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "Tokens allowed should be a deployed ERC20 contract"
         );
         require(
-            _decimals > 0 && _decimals <= 18,
+            _decimals > 0 && _decimals <= MAX_DECIMALS,
             "Decimals should be greather than 0 and less or equal to 18"
         );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
@@ -331,7 +329,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
         // Normalize to _fromToken decimals and calculate the amount of tokens to convert
         if (MAX_DECIMALS > fromTokenDecimals)  {
-             // Ceil the result of the normalization always fue to convertions fee
+             // Ceil the result of the normalization always due to convertions fee
             totalPriceInToken = totalPriceInToken
             .div(10**(MAX_DECIMALS - fromTokenDecimals))
             .add(1);

@@ -277,7 +277,7 @@ contract ITokenConverter {
     * @param _toToken - IERC20 token 
     * @param _fromAmount - uint256 amount to be converted
     * @param _minReturn - uint256 mininum amount to be returned
-    * @return uin2556 of the amount after convertion
+    * @return uin256 of the amount after convertion
     */
     function convert(
         IERC20 _fromToken,
