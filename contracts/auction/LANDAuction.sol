@@ -111,19 +111,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Current LAND price. If the auction was not started returns the started price
-    * @return uint256 current LAND price
-    */
-    function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
-            return _getPrice(0);
-        } else {
-            uint256 timePassed = block.timestamp - startedTime;
-            return _getPrice(timePassed);
-        }
-    }
-
-    /**
     * @dev Make a bid for LANDs
     * @param _xs - uint256[] x values for the LANDs to bid
     * @param _ys - uint256[] y values for the LANDs to bid
@@ -135,7 +122,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         int[] _ys, 
         address _beneficiary, 
         ERC20 _fromToken
-    ) external whenNotPaused 
+    ) external 
     {
         _validateBidParameters(
             _xs, 
