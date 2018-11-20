@@ -1218,22 +1218,21 @@ contract('LANDAuction', function([
       bidderMANABalance.should.be.bignumber.gte(web3.toWei(10, 'ether'))
     })
 
-    it('should bid with less gas Price', async function() {
-      await landAuction.bid(
-        [-150, 150],
-        [-150, 150],
-        bidder,
-        manaToken.address,
-        {
-          ...fromBidder,
-          gasPrice: gasPriceLimit - 1
-        }
-      )
-    })
-
     it('should bid and keep a percentage of the token', async function() {
       // Get prev balance of bidder of DAI token
       const bidderDAIPrevBalance = await daiToken.balanceOf(bidder)
+
+      // Check MANA balance of LAND Auction contract
+      let balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check DAI balance of LAND Auction contract
+      balance = await daiToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check balance of dai charity contract
+      balance = await daiToken.balanceOf(daiCharity.address)
+      balance.should.be.bignumber.equal(0)
 
       // Bid
       const { logs } = await landAuction.bid(xs, ys, bidder, daiToken.address, {
@@ -1305,16 +1304,73 @@ contract('LANDAuction', function([
       )
 
       // Check MANA balance of LAND Auction contract
-      let balance = await manaToken.balanceOf(landAuction.address)
+      balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
 
       // Check DAI balance of LAND Auction contract
       balance = await daiToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
 
+      // Check balance of dai charity contract
+      balance = await daiToken.balanceOf(daiCharity.address)
+      balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+
+      // Check balance of bidder
       balance = await daiToken.balanceOf(bidder)
       balance.should.be.bignumber.equal(
         bidderDAIPrevBalance.minus(logs[0].args._totalPriceInToken)
+      )
+    })
+
+    it('should bid and transfer funds if token does not implement burn', async function() {
+      await landAuction.allowManyTokens(
+        [dclToken.address],
+        [SPECIAL_DECIMALS],
+        [true],
+        fromOwner
+      )
+
+      // Check DCL balance of LAND Auction contract
+      let balance = await dclToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check MANA balance of LAND Auction contract
+      balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check DCL balance of Token Killer contract
+      balance = await dclToken.balanceOf(tokenKiller.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Bid
+      const { logs } = await landAuction.bid(xs, ys, bidder, dclToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      // Check DCL balance of LAND Auction contract
+      balance = await dclToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check MANA balance of LAND Auction contract
+      balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      // Check DCL balance of Token Killer contract
+      balance = await dclToken.balanceOf(tokenKiller.address)
+      balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+    })
+
+    it('should bid with less gas Price', async function() {
+      await landAuction.bid(
+        [-150, 150],
+        [-150, 150],
+        bidder,
+        manaToken.address,
+        {
+          ...fromBidder,
+          gasPrice: gasPriceLimit - 1
+        }
       )
     })
 
