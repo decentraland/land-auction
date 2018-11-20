@@ -663,7 +663,7 @@ contract('LANDAuction', function([
       }
     })
 
-    it.only('should get current price', async function() {
+    it('should get current price', async function() {
       // Day 0
       let oldPrice = await getCurrentPrice()
       let price = oldPrice
