@@ -347,12 +347,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
     * the convertion fee.
+    * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
     function _convertSafe(
-        uint256 bidId,
+        uint256 _bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
     ) internal returns (uint256 totalPrice)
@@ -420,7 +421,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_fromToken.approve(address(dex), 0), "Error remove approval");
 
         emit BidConvertion(
-            bidId,
+            _bidId,
             address(_fromToken),
             totalPrice,
             totalPriceInToken - change,
