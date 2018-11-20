@@ -231,15 +231,82 @@ library Address {
   }
 }
 
+// File: openzeppelin-eth/contracts/token/ERC20/IERC20.sol
+
+/**
+ * @title ERC20 interface
+ * @dev see https://github.com/ethereum/EIPs/issues/20
+ */
+interface IERC20 {
+  function totalSupply() external view returns (uint256);
+
+  function balanceOf(address who) external view returns (uint256);
+
+  function allowance(address owner, address spender)
+    external view returns (uint256);
+
+  function transfer(address to, uint256 value) external returns (bool);
+
+  function approve(address spender, uint256 value)
+    external returns (bool);
+
+  function transferFrom(address from, address to, uint256 value)
+    external returns (bool);
+
+  event Transfer(
+    address indexed from,
+    address indexed to,
+    uint256 value
+  );
+
+  event Approval(
+    address indexed owner,
+    address indexed spender,
+    uint256 value
+  );
+}
+
+// File: contracts/dex/ITokenConverter.sol
+
+contract ITokenConverter {    
+    using SafeMath for uint256;
+
+    /**
+    * @dev Makes a simple ERC20 -> ERC20 token trade
+    * @param _fromToken - IERC20 token
+    * @param _toToken - IERC20 token 
+    * @param _fromAmount - uint256 amount to be converted
+    * @param _minReturn - uint256 mininum amount to be returned
+    * @return uin256 of the amount after convertion
+    */
+    function convert(
+        IERC20 _fromToken,
+        IERC20 _toToken,
+        uint256 _fromAmount,
+        uint256 _minReturn
+        ) external payable returns (uint256 amount);
+
+    /**
+    * @dev Get exchange rate and slippage rate. 
+    * Note that these returned values are in 18 decimals regardless of the destination token's decimals.
+    * @param _fromToken - IERC20 token
+    * @param _toToken - IERC20 token 
+    * @param _fromAmount - uint256 amount to be converted
+    * @return uint256 of the expected rate
+    * @return uint256 of the slippage rate
+    */
+    function getExpectedRate(IERC20 _fromToken, IERC20 _toToken, uint256 _fromAmount) 
+        public view returns(uint256 expectedRate, uint256 slippageRate);
+}
+
 // File: contracts/auction/LANDAuctionStorage.sol
 
 /**
-* @title Interface for MANA token conforming to ERC-20
+* @title ERC20 Interface with burn
+* @dev IERC20 imported in ItokenConverter.sol
 */
-contract MANAToken {
-    function balanceOf(address who) public view returns (uint256);
+contract ERC20 is IERC20 {
     function burn(uint256 _value) public;
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
 
@@ -257,8 +324,10 @@ contract LANDAuctionStorage {
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
-    MANAToken public manaToken;
+    ERC20 public manaToken;
     LANDRegistry public landRegistry;
+    ITokenConverter public dex;
+    mapping (address => bool) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -279,6 +348,7 @@ contract LANDAuctionStorage {
 
     event BidSuccessful(
       address indexed _beneficiary,
+      address indexed _token,
       uint256 _price,
       uint256 _totalPrice,
       int[] _xs,
@@ -297,13 +367,31 @@ contract LANDAuctionStorage {
     );
 
     event LandsLimitPerBidChanged(
+      address indexed _caller,
       uint256 _oldLandsLimitPerBid, 
       uint256 _landsLimitPerBid
     );
 
     event GasPriceLimitChanged(
+      address indexed _caller,
       uint256 _oldGasPriceLimit,
       uint256 _gasPriceLimit
+    );
+
+    event DexChanged(
+      address indexed _caller,
+      address indexed _oldDex,
+      address indexed _dex
+    );
+
+    event TokenAllowed(
+      address indexed _caller,
+      address indexed _address
+    );
+
+    event TokenDisabled(
+      address indexed _caller,
+      address indexed _address
     );
 }
 
@@ -320,31 +408,42 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _duration - uint256 duration of the auction in seconds
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
+    * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
+    * @param _allowedTokens - array of ERC20 addresses allowed to bid
     */
     constructor(
         uint256 _initialPrice, 
         uint256 _endPrice, 
         uint256 _duration, 
-        address _manaToken, 
-        address _landRegistry
-    ) public 
-    {
-        require(
-            _manaToken.isContract(),
-            "The MANA token address must be a deployed contract"
-        );
-        manaToken = MANAToken(_manaToken);
+        ERC20 _manaToken, 
+        LANDRegistry _landRegistry,
+        address _dex,
+        address[] _allowedTokens
+    ) public {
+        Ownable.initialize(msg.sender);
 
         require(
-            _landRegistry.isContract(),
+            address(_landRegistry).isContract(),
             "The LANDRegistry token address must be a deployed contract"
         );
-        landRegistry = LANDRegistry(_landRegistry);
+        landRegistry = _landRegistry;
+
+        if (_dex != address(0)) {
+            setDex(_dex);
+        }
+
+        allowToken(address(_manaToken));
+        manaToken = _manaToken;
+
+        for (uint i = 0; i < _allowedTokens.length; i++) {
+            address allowedToken = _allowedTokens[i];            
+            allowToken(allowedToken);
+        }
+
 
         require(_initialPrice > _endPrice, "The start price should be greater than end price");
         require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
 
-        
         duration = _duration;
         initialPrice = _initialPrice;
         endPrice = _endPrice;
@@ -354,14 +453,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "The end price defined should be achieved when auction ends"
         );
 
-        status = Status.created;
-
-        Ownable.initialize(msg.sender);
+        status = Status.created;      
 
         emit AuctionCreated(
             msg.sender,
             initialPrice, 
-            endPrice, 
+            endPrice,
             duration
         );
     }
@@ -388,52 +485,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         emit AuctionStarted(msg.sender, startedTime);
     }
 
-     /**
-    * @dev Make a bid for LANDs
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
-    * @param _beneficiary - address beneficiary for the LANDs to bid
-    */
-    function bid(int[] _xs, int[] _ys, address _beneficiary) external {
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
-        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
-        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
-        require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
-        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-
-        uint256 amount = _xs.length;
-        uint256 currentPrice = getCurrentPrice();
-        uint256 totalPrice = amount.mul(currentPrice);
-
-        // Transfer MANA to LANDAuction contract
-        require(
-            manaToken.transferFrom(msg.sender, address(this), totalPrice),
-            "Transferring the totalPrice to LANDAuction contract failed"
-        );
-
-        // Assign LANDs to _beneficiary
-        for (uint i = 0; i < _xs.length; i++) {
-            int x = _xs[i];
-            int y = _ys[i];
-            require(
-                -150 <= x && x <= 150 && -150 <= y && y <= 150,
-                "The coordinates should be inside bounds -150 & 150"
-            );
-        }
-        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
-
-
-        emit BidSuccessful(
-            _beneficiary,
-            currentPrice,
-            totalPrice,
-            _xs,
-            _ys
-        );
-    }
-
     /**
     * @dev Burn the MANA earned by the auction
     */
@@ -450,6 +501,69 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         manaToken.burn(balance);
 
         emit MANABurned(msg.sender, balance);
+    }
+
+    /**
+    * @dev Make a bid for LANDs
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function bid(
+        int[] _xs, 
+        int[] _ys, 
+        address _beneficiary, 
+        ERC20 _fromToken
+    ) external 
+    {
+        require(status == Status.started, "The auction was not started");
+        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
+        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
+        require(_xs.length > 0, "You should bid to at least one LAND");
+        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
+        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
+        require(tokensAllowed[address(_fromToken)], "token not accepted");
+
+        uint256 currentPrice = getCurrentPrice();
+        uint256 totalPrice = _xs.length.mul(currentPrice);
+
+        if (address(_fromToken) != address(manaToken)) {
+            require(
+                address(dex).isContract(), 
+                "Pay with other token than MANA is not available"
+            );
+            // Convert _fromToken to MANA
+            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
+        } else {
+            // Transfer MANA to LANDAuction contract
+            require(
+                _fromToken.transferFrom(msg.sender, address(this), totalPrice),
+                "Transfering the totalPrice to LANDAuction contract failed"
+            );
+        }
+
+        // Assign LANDs to _beneficiary
+        for (uint i = 0; i < _xs.length; i++) {
+            int x = _xs[i];
+            int y = _ys[i];
+            require(
+                -150 <= x && x <= 150 && -150 <= y && y <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+        }
+        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
+
+
+        emit BidSuccessful(
+            _beneficiary,
+            _fromToken,
+            currentPrice,
+            totalPrice,
+            _xs,
+            _ys
+        );
     }
 
     /**
@@ -482,7 +596,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner {
         require(_landsLimitPerBid > 0, "The lands limit should be greater than 0");
-        emit LandsLimitPerBidChanged(landsLimitPerBid, _landsLimitPerBid);
+        emit LandsLimitPerBidChanged(msg.sender, landsLimitPerBid, _landsLimitPerBid);
         landsLimitPerBid = _landsLimitPerBid;
     }
 
@@ -492,11 +606,48 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function setGasPriceLimit(uint256 _gasPriceLimit) public onlyOwner {
         require(_gasPriceLimit > 0, "The gas price should be greater than 0");
-        emit GasPriceLimitChanged(gasPriceLimit, _gasPriceLimit);
+        emit GasPriceLimitChanged(msg.sender, gasPriceLimit, _gasPriceLimit);
         gasPriceLimit = _gasPriceLimit;
     }
 
-     /**
+    /**
+    * @dev Set dex to convert ERC20
+    * @param _dex - address of the token converter
+    */
+    function setDex(address _dex) public onlyOwner {
+        require(_dex != address(dex), "The dex is the current");
+        if (_dex != address(0)) {
+            require(_dex.isContract(), "The dex address must be a deployed contract");
+        }
+        emit DexChanged(msg.sender, dex, _dex);
+        dex = ITokenConverter(_dex);
+    }
+
+    /**
+    * @dev Allow ERC20 to to be used for bidding
+    * @param _address - address of the ERC20 Token
+    */
+    function allowToken(address _address) public onlyOwner {
+        require(
+            _address.isContract(),
+            "Tokens allowed should be a deployed ERC20 contract"
+        );
+        require(!tokensAllowed[_address], "The ERC20 token is already allowed");
+        tokensAllowed[_address] = true;
+        emit TokenAllowed(msg.sender, _address);
+    }
+
+    /**
+    * @dev Disable ERC20 to to be used for bidding
+    * @param _address - address of the ERC20 Token
+    */
+    function disableToken(address _address) public onlyOwner {
+        require(tokensAllowed[_address], "The ERC20 token is already disabled");
+        tokensAllowed[_address] = false;
+        emit TokenDisabled(msg.sender, _address);
+    }
+
+    /**
     * @dev Calculate LAND price based on time
     * It is a linear function y = ax - b. But The slope should be negative.
     * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
@@ -511,5 +662,49 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             return endPrice;
         }
         return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
+    }
+
+    /**
+    * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
+    * Note that we will use the slippageRate cause it has a 3% buffer
+    * @param _fromToken - ERC20 token to be converted
+    * @param _totalPrice - uint256 of the total amount in MANA
+    * @return bool to confirm the convertion was successfully
+    */
+    function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
+        uint256 prevBalance = manaToken.balanceOf(address(this));
+        uint256 tokenRate;
+        (, tokenRate) = dex.getExpectedRate(_fromToken, manaToken, _totalPrice);
+        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
+
+        require(
+            _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
+            "Transfering the totalPrice in token to LANDAuction contract failed"
+        );
+        
+        require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
+
+        uint256 bought = dex.convert(
+                _fromToken,
+                manaToken,
+                totalPriceInToken,
+                1
+            );
+        require(
+            manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
+            "Bought amount incorrect"
+        );
+
+        if (bought > _totalPrice) {
+            // return mana to sender
+            uint256 change = bought.sub(_totalPrice);
+            require(
+                manaToken.transfer(msg.sender, change),
+                "Transfering the change to sender failed"
+            );
+        }
+
+        require(_fromToken.approve(address(dex), 0), "Error remove approve");
+        return true;
     }
 }

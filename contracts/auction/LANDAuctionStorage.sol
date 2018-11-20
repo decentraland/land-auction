@@ -1,13 +1,14 @@
 pragma solidity ^0.4.24;
 
+import "../dex/ITokenConverter.sol";
+
 
 /**
-* @title Interface for MANA token conforming to ERC-20
+* @title ERC20 Interface with burn
+* @dev IERC20 imported in ItokenConverter.sol
 */
-contract MANAToken {
-    function balanceOf(address who) public view returns (uint256);
+contract ERC20 is IERC20 {
     function burn(uint256 _value) public;
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
 
@@ -20,13 +21,24 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
+    uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
+    uint256 constant public MAX_DECIMALS = 18;
+
     enum Status { created, started, finished }
+
+    struct tokenAllowed {
+        uint256 decimals;
+        bool shouldKeepToken;
+        bool isAllowed;
+    }
 
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
-    MANAToken public manaToken;
+    ERC20 public manaToken;
     LANDRegistry public landRegistry;
+    ITokenConverter public dex;
+    mapping (address => tokenAllowed) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -47,6 +59,7 @@ contract LANDAuctionStorage {
 
     event BidSuccessful(
       address indexed _beneficiary,
+      address indexed _token,
       uint256 _price,
       uint256 _totalPrice,
       int[] _xs,
@@ -65,12 +78,32 @@ contract LANDAuctionStorage {
     );
 
     event LandsLimitPerBidChanged(
+      address indexed _caller,
       uint256 _oldLandsLimitPerBid, 
       uint256 _landsLimitPerBid
     );
 
     event GasPriceLimitChanged(
+      address indexed _caller,
       uint256 _oldGasPriceLimit,
       uint256 _gasPriceLimit
+    );
+
+    event DexChanged(
+      address indexed _caller,
+      address indexed _oldDex,
+      address indexed _dex
+    );
+
+    event TokenAllowed(
+      address indexed _caller,
+      address indexed _address,
+      uint256 _decimals,
+      bool _shouldKeepToken
+    );
+
+    event TokenDisabled(
+      address indexed _caller,
+      address indexed _address
     );
 }
