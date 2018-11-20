@@ -17,6 +17,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * the first value of _yPoints will be the initial price and the last value will be the endPrice
     * @param _xPoints - uint256[] of seconds
     * @param _yPoints - uint256[] of prices
+    * @param _startTime - uint256 timestamp in seconds when the auction will start
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
+    * @param _gasPriceLimit - uint256 gas price limit for a single bid
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
@@ -24,6 +27,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     constructor(
         uint256[] _xPoints, 
         uint256[] _yPoints, 
+        uint256 _startTime,
+        uint256 _landsLimitPerBid,
+        uint256 _gasPriceLimit,
         ERC20 _manaToken, 
         ERC20 _daiToken,
         LANDRegistry _landRegistry,
@@ -33,6 +39,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     ) public {
         // Initialize owneable
         Ownable.initialize(msg.sender);
+
+        // Schedule auction
+        require(_startTime > block.timestamp, "Started time should be after now");
+        startTime = _startTime;
 
         // Set LANDRegistry
         require(
@@ -70,38 +80,39 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
+
+        // Set limits
+        setLandsLimitPerBid(_landsLimitPerBid);
+        setGasPriceLimit(_gasPriceLimit);
         
         // Initialize status
         status = Status.created;      
 
         emit AuctionCreated(
             msg.sender,
+            _startTime,
+            duration,
             initialPrice, 
-            endPrice,
-            duration
+            endPrice
         );
     }
 
     /**
-    * @dev Start the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
-    * @param _gasPriceLimit - uint256 gas price limit for a single bid
+    * @dev Burn the MANA earned by the auction
     */
-    function startAuction(
-        uint256 _landsLimitPerBid,
-        uint256 _gasPriceLimit
-    ) 
-    external onlyOwner 
-    {
-        require(status == Status.created, "The auction was started");
+    function burnFunds() external {
+        require(
+            status == Status.finished,
+            "Burn should be performed when the auction is finished"
+        );
+        uint256 balance = manaToken.balanceOf(address(this));
+        require(
+            balance > 0,
+            "No MANA to burn"
+        );
+        manaToken.burn(balance);
 
-        setLandsLimitPerBid(_landsLimitPerBid);
-        setGasPriceLimit(_gasPriceLimit);
-
-        startedTime = block.timestamp;
-        status = Status.started;
-
-        emit AuctionStarted(msg.sender, startedTime);
+        emit MANABurned(msg.sender, balance);
     }
 
     /**
@@ -124,6 +135,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _beneficiary, 
             _fromToken
         );
+        
         uint256 bidId = _getBidId();
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -203,15 +215,15 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Current LAND price. 
-    * Note that if the auction was not started returns the started price and when
+    * Note that if the auction was not started returns the initial price and when
     * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
     function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
+        if (startTime == 0 || startTime >= block.timestamp) {
             return initialPrice;
         } else {
-            uint256 timePassed = block.timestamp - startedTime;
+            uint256 timePassed = block.timestamp - startTime;
             if (timePassed >= duration) {
                 return endPrice;
             }

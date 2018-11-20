@@ -23,7 +23,7 @@ contract LANDAuctionStorage {
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startedTime;
+    uint256 internal startTime;
     uint256 internal duration;
 
     uint256 public gasPriceLimit;
@@ -141,8 +141,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Calculate LAND price based on time
     * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startedTime)
+    * Based on two points (initialPrice; startTime = 0) and (endPrice; endTime = duration)
+    * slope = (endPrice - startedPrice) / (duration - startTime)
     * As Solidity does not support negative number we use it as: y = b - ax
     * @param _time - uint256 time passed before reach duration
     * @return uint256 price for the given time

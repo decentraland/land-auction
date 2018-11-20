@@ -16,8 +16,7 @@ const KyberMock = artifacts.require('KyberMock')
 
 const AUCTION_STATUS_OP_CODES = {
   created: 0,
-  started: 1,
-  finished: 2
+  finished: 1
 }
 
 const MAX_DECIMALS = 18
@@ -172,7 +171,7 @@ contract('LANDAuction', function([
   const xs = [1, 2, 3, 4]
   const ys = [1, 2, 3, 4]
 
-  let initialTime
+  let startTime
 
   let landAuction
   let manaToken
@@ -196,7 +195,10 @@ contract('LANDAuction', function([
     gas: 6e6,
     gasPrice: 21e9
   }
-  const getFunc = _time => {
+
+  const farAwayStartTime = getBlockchainTime() + duration.days(10)
+
+  function getFunc(_time) {
     for (let i = 0; i < time.length - 1; i++) {
       const x1 = time[i]
       const x2 = time[i + 1]
@@ -208,7 +210,7 @@ contract('LANDAuction', function([
     }
   }
 
-  const getPriceWithLinearFunction = (time, toWei = true) => {
+  function getPriceWithLinearFunction(time, toWei = true) {
     const { x1, x2, y1, y2 } = getFunc(time)
 
     const b = ((x2 * y1 - x1 * y2) * 10 ** 18) / (x2 - x1)
@@ -227,7 +229,7 @@ contract('LANDAuction', function([
     return price
   }
 
-  const getCurrentPrice = async () => {
+  async function getCurrentPrice() {
     const price = await landAuction.getCurrentPrice()
     return weiToDecimal(price.toNumber())
   }
@@ -255,10 +257,15 @@ contract('LANDAuction', function([
 
     // Create KyberConverter
     kyberConverter = await KyberConverter.new(kyberMock.address, owner)
+
+    startTime = getBlockchainTime() + duration.minutes(1)
     // Create a LANDAuction
     landAuction = await LANDAuction.new(
       time,
       prices,
+      startTime,
+      landsLimitPerBid,
+      gasPriceLimit,
       manaToken.address,
       daiToken.address,
       landRegistry.address,
@@ -267,6 +274,7 @@ contract('LANDAuction', function([
       tokenKiller.address,
       fromOwner
     )
+    const logs = await getEvents(landAuction, 'AuctionCreated')
 
     // Assign balance to bidders and allow LANDAuction to move MANA
     await manaToken.setBalance(web3.toWei(10000000, 'ether'), fromBidder)
@@ -320,13 +328,11 @@ contract('LANDAuction', function([
       fromAnotherBidder
     )
 
-    // Start auction
-    const { logs } = await landAuction.startAuction(
-      landsLimitPerBid,
-      gasPriceLimit,
-      fromOwner
-    )
-    initialTime = logs[2].args._time
+    // Increase auction tiomestamp
+    let diff = logs[0].args._startTime - getBlockchainTime()
+    if (diff > 0) {
+      await increaseTime(duration.seconds(diff))
+    }
   })
 
   describe('constructor', function() {
@@ -334,6 +340,9 @@ contract('LANDAuction', function([
       const _landAuction = await LANDAuction.new(
         time,
         prices,
+        farAwayStartTime,
+        landsLimitPerBid,
+        gasPriceLimit,
         manaToken.address,
         daiToken.address,
         landRegistry.address,
@@ -347,6 +356,7 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(1)
       assertEvent(logs[0], 'AuctionCreated', {
         _caller: owner,
+        _startTime: farAwayStartTime.toString(),
         _initialPrice: initialPrice.toString(),
         _endPrice: endPrice.toString(),
         _duration: auctionDuration.toString()
@@ -375,6 +385,9 @@ contract('LANDAuction', function([
       await LANDAuction.new(
         time,
         prices,
+        farAwayStartTime,
+        landsLimitPerBid,
+        gasPriceLimit,
         manaToken.address,
         daiToken.address,
         landRegistry.address,
@@ -390,6 +403,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           [0, ...prices],
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -406,6 +422,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           [...prices, initialPrice],
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -422,6 +441,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           [...time, duration.days(1)],
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -438,6 +460,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           zeroAddress,
           daiToken.address,
           landRegistry.address,
@@ -452,6 +477,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           0,
           daiToken.address,
           landRegistry.address,
@@ -466,6 +494,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           owner,
           daiToken.address,
           landRegistry.address,
@@ -482,6 +513,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           zeroAddress,
@@ -496,6 +530,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           0,
@@ -510,6 +547,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           owner,
@@ -526,6 +566,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -612,83 +655,66 @@ contract('LANDAuction', function([
         )
       )
     })
-  })
 
-  describe('startAuction', function() {
-    let _landAuction
-    beforeEach(async function() {
-      _landAuction = await LANDAuction.new(
-        time,
-        prices,
-        manaToken.address,
-        daiToken.address,
-        landRegistry.address,
-        kyberConverter.address,
-        daiCharity.address,
-        tokenKiller.address,
-        fromOwner
-      )
-    })
-
-    it('should start auction', async function() {
-      const { logs } = await _landAuction.startAuction(
-        landsLimitPerBid,
-        gasPriceLimit,
-        fromOwner
-      )
-
-      logs.length.should.be.equal(3)
-
-      assertEvent(logs[0], 'LandsLimitPerBidChanged', {
-        _caller: owner,
-        _oldLandsLimitPerBid: '0',
-        _landsLimitPerBid: landsLimitPerBid.toString()
-      })
-
-      assertEvent(logs[1], 'GasPriceLimitChanged', {
-        _caller: owner,
-        _oldGasPriceLimit: '0',
-        _gasPriceLimit: gasPriceLimit.toString()
-      })
-
-      assertEvent(logs[2], 'AuctionStarted', {
-        _caller: owner,
-        _time: getBlockchainTime().toString()
-      })
-
-      const status = await _landAuction.status()
-      const _landLimit = await _landAuction.landsLimitPerBid()
-      const _gasPriceLimit = await _landAuction.gasPriceLimit()
-
-      status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.started)
-      _landLimit.should.be.bignumber.equal(landsLimitPerBid)
-      _gasPriceLimit.should.be.bignumber.equal(gasPriceLimit)
-    })
-
-    it('reverts when trying to re-start auction', async function() {
-      await _landAuction.startAuction(
-        landsLimitPerBid,
-        gasPriceLimit,
-        fromOwner
-      )
+    it('reverts if creator creates with incorrect values :: startTime now or before', async function() {
       await assertRevert(
-        _landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromOwner)
+        LANDAuction.new(
+          time,
+          prices,
+          getBlockchainTime(),
+          landsLimitPerBid,
+          gasPriceLimit,
+          manaToken.address,
+          landRegistry.address,
+          kyberConverter.address,
+          fromOwner
+        )
+      )
+
+      await assertRevert(
+        LANDAuction.new(
+          time,
+          prices,
+          getBlockchainTime() - 1,
+          landsLimitPerBid,
+          gasPriceLimit,
+          manaToken.address,
+          landRegistry.address,
+          kyberConverter.address,
+          fromOwner
+        )
       )
     })
 
-    it('reverts when no-owner trying to start auction', async function() {
+    it('reverts if creator creates with incorrect values :: landsLimitPerBid = 0', async function() {
       await assertRevert(
-        _landAuction.startAuction(landsLimitPerBid, gasPriceLimit, fromHacker)
+        LANDAuction.new(
+          time,
+          prices,
+          farAwayStartTime,
+          0,
+          gasPriceLimit,
+          manaToken.address,
+          landRegistry.address,
+          kyberConverter.address,
+          fromOwner
+        )
       )
     })
 
-    it('reverts when landLimit = 0', async function() {
-      await assertRevert(_landAuction.startAuction(0, gasPriceLimit, fromOwner))
-    })
-
-    it('reverts when gasPriceLimit = 0', async function() {
+    it('reverts if creator creates with incorrect values :: gasPriceLimit = 0', async function() {
       await assertRevert(
-        _landAuction.startAuction(landsLimitPerBid, 0, fromOwner)
+        LANDAuction.new(
+          time,
+          prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          0,
+          manaToken.address,
+          landRegistry.address,
+          kyberConverter.address,
+          fromOwner
+        )
       )
     })
   })
@@ -748,7 +774,7 @@ contract('LANDAuction', function([
       assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
         _caller: owner,
         _time: time.toString(),
-        _price: getPriceWithLinearFunction(time - initialTime).toString()
+        _price: getPriceWithLinearFunction(time - startTime).toString()
       })
 
       const status = await landAuction.status()
@@ -778,14 +804,14 @@ contract('LANDAuction', function([
       let oldPrice = await getCurrentPrice()
       let price = oldPrice
       let time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
 
       // Day 5
       await increaseTime(duration.days(5))
       price = await getCurrentPrice()
       price.should.be.lt(oldPrice)
       time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
       oldPrice = price
 
       // Day 14
@@ -793,7 +819,7 @@ contract('LANDAuction', function([
       price = await getCurrentPrice()
       price.should.be.lt(oldPrice)
       time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
       oldPrice = price
 
       // Day 14 and 10 hours
@@ -801,7 +827,7 @@ contract('LANDAuction', function([
       price = await getCurrentPrice()
       price.should.be.lt(oldPrice)
       time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - initialTime))
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
     })
 
     it('should get end price when auction time finished', async function() {
@@ -830,7 +856,7 @@ contract('LANDAuction', function([
         }
       )
 
-      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
+      const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time)
 
       logs.length.should.be.equal(2)
@@ -1040,14 +1066,16 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(3)
 
       // Check Log
-      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
-      const price = getPriceWithLinearFunction(time - initialTime)
+      const time = getBlockchainTime(logs[0].blockNumber) - startTime
+      const price = getPriceWithLinearFunction(time)
       const totalPrice = price * xs.length
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
         logs[0].args._totalPriceInMana
       )
+
+      logs.length.should.be.equal(1)
 
       assertEvent(
         normalizeEvent(logs[0]),
@@ -1144,7 +1172,7 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(3)
 
       // Check Log
-      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
+      const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time)
 
       // add 1 cause we do the same in the contract to ensure the min MANA to buy
@@ -1240,7 +1268,7 @@ contract('LANDAuction', function([
 
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber)
-      const price = getPriceWithLinearFunction(time - initialTime)
+      const price = getPriceWithLinearFunction(time - startTime)
       const totalPrice = price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
@@ -1483,7 +1511,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if user bids when now - initialTime > duration ', async function() {
+    it('reverts if user bids when now - startTime > duration ', async function() {
       await increaseTime(auctionDuration)
       await increaseTime(duration.seconds(1))
       await assertRevert(
@@ -1508,6 +1536,30 @@ contract('LANDAuction', function([
       const erc20 = await ERC20Token.new(creationParams)
       await assertRevert(
         landAuction.bid(xs, ys, bidder, erc20.address, {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        })
+      )
+    })
+
+    it('reverts if auction has not started', async function() {
+      const _landAuction = await LANDAuction.new(
+        time,
+        prices,
+        getBlockchainTime() + duration.days(10),
+        landsLimitPerBid,
+        gasPriceLimit,
+        manaToken.address,
+        landRegistry.address,
+        kyberConverter.address,
+        fromOwner
+      )
+
+      const logs = await getEvents(_landAuction, 'AuctionCreated')
+      parseInt(logs[0].args._startTime).should.be.gt(getBlockchainTime())
+
+      await assertRevert(
+        _landAuction.bid(xs, ys, bidder, manaToken.address, {
           ...fromBidder,
           gasPrice: gasPriceLimit
         })
