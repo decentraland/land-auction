@@ -344,7 +344,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
+    * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
     * the convertion fee.
     * @param _bidId - uint256 of the bid Id
