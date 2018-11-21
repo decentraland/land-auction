@@ -204,69 +204,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Make a bid for LANDs
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
-    * @param _beneficiary - address beneficiary for the LANDs to bid
-    * @param _fromToken - token used to bid
-    */
-    function bid(
-        int[] _xs, 
-        int[] _ys, 
-        address _beneficiary, 
-        ERC20 _fromToken
-    ) external whenNotPaused 
-    {
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
-        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
-        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
-        require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
-        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)], "token not accepted");
-
-        uint256 currentPrice = getCurrentPrice();
-        uint256 totalPrice = _xs.length.mul(currentPrice);
-
-        if (address(_fromToken) != address(manaToken)) {
-            require(
-                address(dex).isContract(), 
-                "Pay with other token than MANA is not available"
-            );
-            // Convert _fromToken to MANA
-            require(convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
-        } else {
-            // Transfer MANA to LANDAuction contract
-            require(
-                _fromToken.transferFrom(msg.sender, address(this), totalPrice),
-                "Transfering the totalPrice to LANDAuction contract failed"
-            );
-        }
-
-        // Assign LANDs to _beneficiary
-        for (uint i = 0; i < _xs.length; i++) {
-            int x = _xs[i];
-            int y = _ys[i];
-            require(
-                -150 <= x && x <= 150 && -150 <= y && y <= 150,
-                "The coordinates should be inside bounds -150 & 150"
-            );
-        }
-        landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
-
-
-        emit BidSuccessful(
-            _beneficiary,
-            _fromToken,
-            currentPrice,
-            totalPrice,
-            _xs,
-            _ys
-        );
-    }
-
-    /**
     * @dev Current LAND price. 
     * Note that if the auction was not started returns the started price and when
     * the auction is finished return the endPrice
@@ -391,23 +328,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     ) public view returns (uint256 rate) 
     {
         (, rate) = dex.getExpectedRate(_srcToken, _destToken, _srcAmount);
-    }
-
-    /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startedTime)
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * It should return endPrice if _time < duration
-    * @param _time - uint256 time passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _getPrice(uint256 _time) internal view returns (uint256) {
-        if (_time >= duration) {
-            return endPrice;
-        }
-        return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
     }
 
     /**
@@ -592,7 +512,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             uint256 y2 = _yPoints[i + 1];
             require(x1 < x2, "X points should increase");
             require(y1 > y2, "Y points should decrease");
-            (uint256 base, uint256 slope) = _getFunc(x1, x2, y1, y2);
+            (uint256 base, uint256 slope) = _getFunc(
+                x1, 
+                x2, 
+                y1, 
+                y2
+            );
             curves.push(Func({
                 base: base,
                 slope: slope,
@@ -603,7 +528,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         initialPrice = _yPoints[0];
         endPrice = _yPoints[pointsLength - 1];
     }
-
 
     /**
     * @dev LAND price based on time

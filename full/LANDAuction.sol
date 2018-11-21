@@ -276,8 +276,8 @@ contract ITokenConverter {
     * @param _srcToken - IERC20 token
     * @param _destToken - IERC20 token 
     * @param _srcAmount - uint256 amount to be converted
-    * @param _minReturn - uint256 mininum amount to be returned
-    * @return uin256 of the amount after convertion
+    * @param _destAmount - uint256 amount to get after convertion
+    * @return bool true if the convertion was success
     */
     function convert(
         IERC20 _srcToken,
@@ -324,38 +324,27 @@ contract LANDAuctionStorage {
 
     enum Status { created, started, finished }
 
-<<<<<<< HEAD
-    struct Token {
-=======
     struct Func {
         uint256 slope;
         uint256 base;
         uint256 limit;
     }
-    struct tokenAllowed {
->>>>>>> feat: simplify computation
+    struct Token {
         uint256 decimals;
         bool shouldKeepToken;
         bool isAllowed;
     }
 
-<<<<<<< HEAD
     uint256 public convertionFee = 105;
     uint256 public totalBids = 0;
-=======
->>>>>>> feat: simplify computation
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
-<<<<<<< HEAD
     mapping (address => Token) public tokensAllowed;
-=======
-    mapping (address => tokenAllowed) public tokensAllowed;
     Func[] internal curves;
->>>>>>> feat: simplify computation
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -474,27 +463,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
-        // Set Dex
-        if (_dex != address(0)) {
-            setDex(_dex);
-        }
+        setDex(_dex);
 
-<<<<<<< HEAD
-        allowToken(address(_manaToken), 18, true);
-        manaToken = _manaToken;
-
-        require(_initialPrice > _endPrice, "The start price should be greater than end price");
-        require(_duration > 24 * 60 * 60, "The duration should be greater than 1 day");
-
-        duration = _duration;
-        initialPrice = _initialPrice;
-        endPrice = _endPrice;
-
-        require(
-            endPrice == _getPrice(duration),
-            "The end price defined should be achieved when auction ends"
-        );
-=======
         // Set MANAToken
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
@@ -502,7 +472,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Set total duration of the auction
         duration = _xPoints[_xPoints.length - 1];
         require(duration > 24 * 60 * 60, "The duration should be greater than 1 day");
->>>>>>> feat: simplify computation
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
@@ -579,23 +548,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) external 
     {
-<<<<<<< HEAD
         _validateBidParameters(
             _xs, 
             _ys, 
             _beneficiary, 
             _fromToken
         );
-=======
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
-        require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
-        require(_beneficiary != address(0), "The beneficiary could not be 0 address");
-        require(_xs.length > 0, "You should bid to at least one LAND");
-        require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
-        require(_xs.length == _ys.length, "X values length should be equal to Y values length");
-        require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
->>>>>>> feat: simplify computation
 
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -606,11 +564,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-<<<<<<< HEAD
             totalPrice = _convertSafe(totalBids, _fromToken, totalPrice);
-=======
-            require(_convertSafe(_fromToken, totalPrice), "Converting token to MANA failed");
->>>>>>> feat: simplify computation
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -669,30 +623,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _fee - uint256 for the new convertion rate
     */
     function setConvertionFee(uint256 _fee) external onlyOwner {
+        require(_fee < 200 && _fee >= 100, "Convertion fee should be >= 100 and < 200");
         emit ConvertionFeeChanged(msg.sender, convertionFee, _fee);
         convertionFee = _fee;
-    }
-
-    /**
-    * @dev Allow many ERC20 tokens to to be used for bidding
-    * @param _address - array of addresses of the ERC20 Token
-    * @param _decimals - array of uint256 of the number of decimals
-    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
-    */
-    function allowManyTokens(
-        address[] _address, 
-        uint256[] _decimals, 
-        bool[] _shouldKeepToken
-    ) external onlyOwner
-    {
-        require(
-            _address.length == _decimals.length && _decimals.length == _shouldKeepToken.length,
-            "The length of _addresses, decimals and _shouldKeepToken should be the same"
-        );
-
-        for (uint i = 0; i < _address.length; i++) {
-            allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
-        }
     }
 
     /**
@@ -774,16 +707,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "Tokens allowed should be a deployed ERC20 contract"
         );
         require(
-            _decimals > 0 && _decimals <= 18,
+            _decimals > 0 && _decimals <= MAX_DECIMALS,
             "Decimals should be greather than 0 and less or equal to 18"
         );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
-<<<<<<< HEAD
         tokensAllowed[_address] = Token({
-=======
-        tokensAllowed[_address] = tokenAllowed({
->>>>>>> feat: simplify computation
             decimals: _decimals,
             shouldKeepToken: _shouldKeepToken,
             isAllowed: true
@@ -811,7 +740,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-<<<<<<< HEAD
     * @dev Get exchange rate
     * @param _srcToken - IERC20 token
     * @param _destToken - IERC20 token 
@@ -828,35 +756,16 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startedTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startedTime)
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * It should return endPrice if _time < duration
-    * @param _time - uint256 time passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _getPrice(uint256 _time) internal view returns (uint256) {
-        if (_time >= duration) {
-            return endPrice;
-        }
-        return  initialPrice.sub(initialPrice.sub(endPrice).mul(_time).div(duration));
-    }
-
-    /**
-=======
->>>>>>> feat: simplify computation
-    * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
+    * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
     * the convertion fee.
+    * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
-<<<<<<< HEAD
     function _convertSafe(
-        uint256 bidId,
+        uint256 _bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
     ) internal returns (uint256 totalPrice)
@@ -891,25 +800,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
          }
 
         // Transfer _fromToken amount from sender to the contract
-=======
-    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool) {
-        uint256 prevBalance = manaToken.balanceOf(address(this));
-
-        uint256 tokenRate;
-        (, tokenRate) = dex.getExpectedRate(manaToken, _fromToken, _totalPrice);
-
-        uint256 totalPriceInToken = _totalPrice.mul(tokenRate).div(10 ** 18);
-
-        uint256 fromTokenDecimals = tokensAllowed[address(_fromToken)].decimals;
-        // Normalize to _fromToken decimals and calculate the amount of tokens to convert
-        if (MAX_DECIMALS > fromTokenDecimals) {
-             // Ceil the result of the normalization always fue to convertions fee
-            totalPriceInToken = totalPriceInToken
-            .div(10**(MAX_DECIMALS - fromTokenDecimals))
-            .add(1);
-        }
-
->>>>>>> feat: simplify computation
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
@@ -918,7 +808,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Approve amount of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
 
-<<<<<<< HEAD
         // Convert _fromToken to MANA
         require(
             dex.convert(
@@ -934,24 +823,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 change = _fromToken.balanceOf(address(this)) - prevTokenBalance - tokensToKeep;
         if (change > 0) {
             // Return the change of src token
-=======
-        // Convert token to MANA
-        uint256 bought = dex.convert(
-                _fromToken,
-                manaToken,
-                totalPriceInToken,
-                _totalPrice
-            );
-        
-        require(
-            manaToken.balanceOf(address(this)).sub(prevBalance) >= bought,
-            "Bought amount incorrect"
-        );
-
-        if (bought > _totalPrice) {
-            // Return change in MANA to sender
-            uint256 change = bought.sub(_totalPrice);
->>>>>>> feat: simplify computation
             require(
                 _fromToken.transfer(msg.sender, change),
                 "Transfering the change to sender failed"
@@ -962,7 +833,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_fromToken.approve(address(dex), 0), "Error remove approval");
 
         emit BidConvertion(
-            bidId,
+            _bidId,
             address(_fromToken),
             totalPrice,
             totalPriceInToken - change,
@@ -1041,10 +912,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _amount - uint256 of the amount to burn
     */
     function _safeBurn(ERC20 _token, uint256 _amount) internal {
-        // keep at least 30000 to emit the burn event
-        uint256 _gas = gasleft() - 3000;
         require(
-            address(_token).call.gas(_gas)(abi.encodeWithSelector(
+            address(_token).call(abi.encodeWithSelector(
                 _token.burn.selector,
                 _amount
             )), 
@@ -1068,7 +937,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             uint256 y2 = _yPoints[i + 1];
             require(x1 < x2, "X points should increase");
             require(y1 > y2, "Y points should decrease");
-            (uint256 base, uint256 slope) = _getFunc(x1, x2, y1, y2);
+            (uint256 base, uint256 slope) = _getFunc(
+                x1, 
+                x2, 
+                y1, 
+                y2
+            );
             curves.push(Func({
                 base: base,
                 slope: slope,
@@ -1079,7 +953,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         initialPrice = _yPoints[0];
         endPrice = _yPoints[pointsLength - 1];
     }
-
 
     /**
     * @dev LAND price based on time

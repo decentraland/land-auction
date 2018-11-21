@@ -253,7 +253,7 @@ contract('LANDAuction', function([
     )
 
     // Assign balance to KyberMock
-    await manaToken.mint(web3.toWei(1000000, 'ether'), kyberMock.address)
+    await manaToken.mint(web3.toWei(10000000, 'ether'), kyberMock.address)
 
     // Create KyberConverter
     kyberConverter = await KyberConverter.new(kyberMock.address, owner)
@@ -268,24 +268,24 @@ contract('LANDAuction', function([
     )
 
     // Assign balance to bidders and allow LANDAuction to move MANA
-    await manaToken.setBalance(web3.toWei(1000000, 'ether'), fromBidder)
-    await manaToken.setBalance(web3.toWei(1000000, 'ether'), fromAnotherBidder)
+    await manaToken.setBalance(web3.toWei(10000000, 'ether'), fromBidder)
+    await manaToken.setBalance(web3.toWei(10000000, 'ether'), fromAnotherBidder)
     await manaToken.approve(
       landAuction.address,
-      web3.toWei(1000000, 'ether'),
+      web3.toWei(10000000, 'ether'),
       fromBidder
     )
     await manaToken.approve(
       landAuction.address,
-      web3.toWei(1000000, 'ether'),
+      web3.toWei(10000000, 'ether'),
       fromAnotherBidder
     )
 
     // Supply bidders with other erc20 tokens and approve landAuction
-    await nchToken.setBalance(web3.toWei(20000000, 'ether'), fromBidder)
-    await nchToken.setBalance(web3.toWei(2000000, 'ether'), fromAnotherBidder)
+    await nchToken.setBalance(web3.toWei(200000000, 'ether'), fromBidder)
+    await nchToken.setBalance(web3.toWei(200000000, 'ether'), fromAnotherBidder)
     await nchToken.setBalance(
-      web3.toWei(2000000, 'ether'),
+      web3.toWei(200000000, 'ether'),
       fromBidderWithOnlyNCH
     )
     await dclToken.setBalance(web3.toWei(3000000000000, 'Mwei'), fromBidder) // 2,000,000  ether cause it is 12 decimals contract
@@ -295,17 +295,17 @@ contract('LANDAuction', function([
     ) // 2,000,000 ether cause it is 12 decimals contract
     await nchToken.approve(
       landAuction.address,
-      web3.toWei(20000000, 'ether'),
+      web3.toWei(200000000, 'ether'),
       fromBidder
     )
     await nchToken.approve(
       landAuction.address,
-      web3.toWei(2000000, 'ether'),
+      web3.toWei(200000000, 'ether'),
       fromAnotherBidder
     )
     await nchToken.approve(
       landAuction.address,
-      web3.toWei(10, 'ether'),
+      web3.toWei(10000000, 'ether'),
       fromBidderWithOnlyNCH
     )
     await dclToken.approve(
@@ -889,7 +889,7 @@ contract('LANDAuction', function([
       )
 
       // Check Log
-      const time = getBlockchainTime(logs[0].blockNumber)
+      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
       const price = getPriceWithLinearFunction(time - initialTime)
       const totalPrice = price * xs.length
       const totalPriceInToken = await kyberMock.getReturn(
@@ -907,7 +907,7 @@ contract('LANDAuction', function([
           _bidId: '0',
           _token: nchToken.address,
           _totalPriceInMana: totalPrice.toString(),
-          _totalPriceInToken: totalPriceInToken.toString(),
+          _totalPriceInToken: scientificToDecimal(totalPriceInToken),
           _tokensKept: '0'
         },
         true
@@ -921,10 +921,9 @@ contract('LANDAuction', function([
           _beneficiary: bidderWithOnlyNCH,
           _token: nchToken.address,
           _price: price.toString(),
-          _totalPrice: totalPrice.toString(),
-          // _totalPrice: weiToDecimal(
-          //   getPriceWithLinearFunction(time, false) * xs.length
-          // ).toString(),
+          _totalPrice: weiToDecimal(
+            getPriceWithLinearFunction(time, false) * xs.length
+          ).toString(),
           _xs: xs,
           _ys: ys
         },
@@ -977,7 +976,7 @@ contract('LANDAuction', function([
       })
 
       // Check Log
-      const time = getBlockchainTime(logs[0].blockNumber)
+      const time = getBlockchainTime(logs[0].blockNumber) - initialTime
       const price = getPriceWithLinearFunction(time - initialTime)
       const totalPrice = price * xs.length
 
@@ -1012,10 +1011,9 @@ contract('LANDAuction', function([
           _beneficiary: bidder,
           _token: dclToken.address,
           _price: price.toString(),
-          _totalPrice: totalPrice.toString(),
-          // _totalPrice: weiToDecimal(
-          //   getPriceWithLinearFunction(time, false) * xs.length
-          // ).toString(),
+          _totalPrice: weiToDecimal(
+            getPriceWithLinearFunction(time, false) * xs.length
+          ).toString(),
           _xs: xs,
           _ys: ys
         },
@@ -1091,7 +1089,7 @@ contract('LANDAuction', function([
           _bidId: '0',
           _token: nchToken.address,
           _totalPriceInMana: totalPrice.toString(),
-          _totalPriceInToken: totalPriceInToken.toString(),
+          _totalPriceInToken: scientificToDecimal(totalPriceInToken),
           _tokensKept: tokensKept.toFixed(0) // remove decimal
         },
         true
@@ -1277,7 +1275,7 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      let balance = await manaToken.balanceOf(landAuction.address)
+      const price = await getCurrentPrice()
       await landAuction.finishAuction(fromOwner)
 
       const prevBalance = await manaToken.balanceOf(landAuction.address)
@@ -1285,9 +1283,6 @@ contract('LANDAuction', function([
 
       const { logs } = await landAuction.burnFunds(manaToken.address, fromOwner)
       logs.length.should.be.equal(1)
-
-      const time = getBlockchainTime(logs[0].blockNumber)
-      const price = getPriceWithLinearFunction(time - initialTime)
 
       assertEvent(
         normalizeEvent(logs[0]),
@@ -1300,7 +1295,7 @@ contract('LANDAuction', function([
         true
       )
 
-      balance = await manaToken.balanceOf(landAuction.address)
+      const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
     })
 
