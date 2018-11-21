@@ -124,7 +124,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _beneficiary, 
             _fromToken
         );
-
+        uint256 bidId = _getBidId();
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
         
@@ -134,7 +134,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            totalPrice = _convertSafe(_fromToken, totalPrice);
+            totalPrice = _convertSafe(bidId, _fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -144,7 +144,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
 
         // Burn Transferred funds
-        _burnFunds(_fromToken);
+        _burnFunds(bidId, _fromToken);
 
         // Assign LANDs to _beneficiary
         for (uint i = 0; i < _xs.length; i++) {
@@ -156,7 +156,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
 
         emit BidSuccessful(
-            totalBids,
+            bidId,
             _beneficiary,
             _fromToken,
             currentPrice,
@@ -165,8 +165,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _ys
         );  
 
-        // Increase bids count
-        totalBids++;
+        // Increment bids count
+        _incrementBids();
     }
 
     /**
@@ -332,11 +332,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
     * the convertion fee.
+    * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
     * @return uint256 of the total amount of MANA
     */
     function _convertSafe(
+        uint256 _bidId,
         ERC20 _fromToken,
         uint256 _totalPrice
     ) internal returns (uint256 totalPrice)
@@ -404,7 +406,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_fromToken.approve(address(dex), 0), "Error remove approval");
 
         emit BidConvertion(
-            totalBids,
+            _bidId,
             address(_fromToken),
             totalPrice,
             totalPriceInToken - change,
@@ -478,16 +480,17 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Burn the MANA and other tokens earned
+    * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
-    function _burnFunds(ERC20 _token) internal {
+    function _burnFunds(uint256 _bidId, ERC20 _token) internal {
         if (_token != manaToken && tokensAllowed[address(_token)].shouldKeepToken) {
             // Burn no MANA token
-            _burnToken(_token);
+            _burnToken(_bidId, _token);
         }
 
         // Burn MANA token
-        _burnToken(manaToken);       
+        _burnToken(_bidId, manaToken);       
     }
 
     
@@ -497,9 +500,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * to the DAI charity contract.
     * For the rest of the tokens if not implement the burn method 
     * we will transfer the funds to a token killer address
+    * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
-    function _burnToken(ERC20 _token) private {
+    function _burnToken(uint256 _bidId, ERC20 _token) private {
         uint256 balance = _token.balanceOf(address(this));
 
         if(_token == daiToken) {
@@ -521,7 +525,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             }
         }
 
-        emit TokenBurned(totalBids, address(_token), balance);
+        emit TokenBurned(_bidId, address(_token), balance);
 
         // Check if balance of the auction contract is empty
         balance = _token.balanceOf(address(this));
@@ -615,5 +619,20 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     {
         base = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
         slope = (_y1.sub(_y2)).div(_x2.sub(_x1));
+    }
+    
+    /**
+    * @dev Return bid id
+    * @return uint256 of the bid id
+    */
+    function _getBidId() private view returns (uint256) {
+        return totalBids;
+    }
+
+    /** 
+    * @dev Increments bid id 
+    */
+    function _incrementBids() private {
+        totalBids = totalBids.add(1);
     }
 }
