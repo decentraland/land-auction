@@ -506,6 +506,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _burnToken(uint256 _bidId, ERC20 _token) private {
         uint256 balance = _token.balanceOf(address(this));
 
+        // Check if balance is valid
+        require(balance > 0, "Balance to burn should be > 0");
+
         if(_token == daiToken) {
             // Transfer to DAI charity if token to burn is DAI
             require(
