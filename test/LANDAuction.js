@@ -735,9 +735,6 @@ contract('LANDAuction', function([
           _token: manaToken.address,
           _price: price.toString(),
           _totalPrice: totalPrice.toString(),
-          // _totalPrice: weiToDecimal(
-          //   getPriceWithLinearFunction(time, false) * xs.length
-          // ).toString(),
           _xs: xs,
           _ys: ys
         },
