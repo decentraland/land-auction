@@ -277,14 +277,14 @@ contract ITokenConverter {
     * @param _destToken - IERC20 token 
     * @param _srcAmount - uint256 amount to be converted
     * @param _destAmount - uint256 amount to get after convertion
-    * @return bool true if the convertion was success
+    * @return uint256 for the change. 0 if there is no change
     */
     function convert(
         IERC20 _srcToken,
         IERC20 _destToken,
         uint256 _srcAmount,
         uint256 _destAmount
-        ) external payable returns (bool);
+        ) external payable returns (uint256);
 
     /**
     * @dev Get exchange rate and slippage rate. 
@@ -769,9 +769,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         uint totalPriceWithDeposit = totalPrice.mul(convertionFee).div(100);
 
-        // Save prev _fromToken balance 
-        uint256 prevTokenBalance = _fromToken.balanceOf(address(this));
-
         // Get rate
         uint256 tokenRate = getRate(manaToken, _fromToken, totalPriceWithDeposit);
 
@@ -792,6 +789,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 totalPriceInToken
             );
          }
+        
 
         // Transfer _fromToken amount from sender to the contract
         require(
@@ -799,22 +797,21 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
         
+        // Calculate the total tokens to convert
+        uint256 totalTokensToConvert = totalPriceInToken.sub(tokensToKeep);
+
         // Approve amount of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
+        require(_fromToken.approve(address(dex), totalTokensToConvert), "Error approve");
 
         // Convert _fromToken to MANA
-        require(
-            dex.convert(
+        uint256 change = dex.convert(
                 _fromToken,
                 manaToken,
-                totalPriceInToken,
+                totalTokensToConvert,
                 totalPrice
-            ), 
-            "Could not convert tokens"
         );
 
        // Return change in _fromToken to sender
-        uint256 change = _fromToken.balanceOf(address(this)) - prevTokenBalance - tokensToKeep;
         if (change > 0) {
             // Return the change of src token
             require(
@@ -830,7 +827,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _bidId,
             address(_fromToken),
             totalPrice,
-            totalPriceInToken - change,
+            totalPriceInToken.sub(change),
             tokensToKeep
         );
     }
