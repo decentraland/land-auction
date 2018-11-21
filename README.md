@@ -31,7 +31,7 @@ contract LANDAuctionStorage {
     MANAToken public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
-    mapping (address => tokenAllowed) public tokensAllowed;
+    mapping (address => TokenAllowed) public tokensAllowed;
 
     event AuctionCreated(
       address indexed _caller,
@@ -45,7 +45,17 @@ contract LANDAuctionStorage {
       uint256 _time
     );
 
+    event BidConvertion(
+      uint256 _bidId,
+      address indexed _token,
+      uint256 _totalPriceInMana,
+      uint256 _totalPriceInToken,
+      uint256 _change,
+      uint256 _tokensKept
+    );
+
     event BidSuccessful(
+      uint256 _bidId,
       address indexed _beneficiary,
       address indexed _token,
       uint256 _price,
@@ -60,8 +70,9 @@ contract LANDAuctionStorage {
       uint256 _price
     );
 
-    event MANABurned(
+    event TokenBurned(
       address indexed _caller,
+      address _token,
       uint256 _total
     );
 
@@ -217,13 +228,68 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function disableToken(address _address) public onlyOwner;
 
     /**
-    * @dev Convert allowed token to MANA and transfer the change in MANA to the sender
-    * Note that we will use the slippageRate cause it has a 3% buffer
+    * @dev Get exchange rate
+    * @param _srcToken - IERC20 token
+    * @param _destToken - IERC20 token
+    * @param _srcAmount - uint256 amount to be converted
+    * @return uint256 of the rate
+    */
+    function getRate(
+        IERC20 _srcToken,
+        IERC20 _destToken,
+        uint256 _srcAmount
+    ) public returns (uint256 rate)
+
+    /**
+    * @dev Convert allowed token to MANA and transfer the change in the original token
+    * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
+    * the convertion fee.
+    * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
-    * @return bool to confirm the convertion was successfully
+    * @return uint256 of the total amount of MANA
     */
-    function convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
+    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
+
+    /**
+    * @dev Validate bid function params
+    * @param _xs - uint256[] x values for the LANDs to bid
+    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _beneficiary - address beneficiary for the LANDs to bid
+    * @param _fromToken - token used to bid
+    */
+    function _validateBidParameters(
+        int[] _xs,
+        int[] _ys,
+        address _beneficiary,
+        ERC20 _fromToken
+    ) internal view;
+
+    function _calculateTokensToKeep(uint256 _totalPrice, uint256 _tokenRate)
+    internal pure returns (uint256 tokensToKeep, uint256 totalPrice);
+
+    /**
+    * @dev Normalize to _fromToken decimals
+    * @param _decimals - uint256 of _fromToken decimals
+    * @param _tokensToKeep - uint256 of the amount of tokens to keep
+    * @param _totalPriceInToken - uint256 of the amount of _fromToken
+    * @return tokensToKeep - uint256 of the amount of tokens to keep in _fromToken decimals
+    * @return totalPriceInToken - address beneficiary for the LANDs to bid in _fromToken decimals
+    */
+    function _normalizeDecimals(
+        uint256 _decimals,
+        uint256 _tokensToKeep,
+        uint256 _totalPriceInToken
+    )
+    internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken);
+
+    /**
+    * @dev Execute burn method.
+    * Note that if the contract does not implement it will revert
+    * @param _token - ERC20 token
+    * @param _amount - uint256 of the amount to burn
+    */
+    function _safeBurn(ERC20 _token, uint256 _amount) internal;
 
 }
 ```

@@ -26,19 +26,21 @@ contract LANDAuctionStorage {
 
     enum Status { created, started, finished }
 
-    struct tokenAllowed {
+    struct Token {
         uint256 decimals;
         bool shouldKeepToken;
         bool isAllowed;
     }
 
+    uint256 public convertionFee = 105;
+    uint256 public totalBids = 0;
     Status public status;
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
-    mapping (address => tokenAllowed) public tokensAllowed;
+    mapping (address => Token) public tokensAllowed;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
@@ -57,7 +59,16 @@ contract LANDAuctionStorage {
       uint256 _time
     );
 
+    event BidConvertion(
+      uint256 _bidId,
+      address indexed _token,
+      uint256 _totalPriceInMana,
+      uint256 _totalPriceInToken,
+      uint256 _tokensKept
+    );
+
     event BidSuccessful(
+      uint256 _bidId,
       address indexed _beneficiary,
       address indexed _token,
       uint256 _price,
@@ -72,8 +83,9 @@ contract LANDAuctionStorage {
       uint256 _price
     );
 
-    event MANABurned(
+    event TokenBurned(
       address indexed _caller,
+      address indexed _token,
       uint256 _total
     );
 
@@ -105,5 +117,11 @@ contract LANDAuctionStorage {
     event TokenDisabled(
       address indexed _caller,
       address indexed _address
+    );
+
+    event ConvertionFeeChanged(
+      address indexed _caller,
+      uint256 _oldConvertionFee,
+      uint256 _convertionFee
     );
 }

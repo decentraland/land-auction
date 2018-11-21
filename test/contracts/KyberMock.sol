@@ -25,33 +25,33 @@ contract KyberMock is IKyberNetwork {
 
     function trade(
         IERC20 _srcToken,
-        uint _srcAmount,
+        uint /* _srcAmount */,
         IERC20 _destToken,
         address _destAddress, 
-        uint /*_maxDestAmount*/,	
+        uint _maxDestAmount,	
         uint _minConversionRate,	
         address /*_walletId*/
     ) public payable returns(uint256) {
         uint256 rate;
-        (, rate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
+        (, rate) = getExpectedRate(_destToken, _srcToken, _maxDestAmount);
         require(rate >= _minConversionRate, "Rate is to low");
-        require(_srcToken.transferFrom(msg.sender, this, _srcAmount), "Could not transfer");
         uint256 destAmount = convertRate(
-            _srcAmount, 
+            _maxDestAmount, 
             rate, 
-            _srcToken, 
-            _destToken
+            _destToken, 
+            _srcToken
         );
-        require(_destToken.transfer(_destAddress, destAmount), "Could not transfer");
-        return destAmount;
+        require(_srcToken.transferFrom(msg.sender, this, destAmount), "Could not transfer");
+        require(_destToken.transfer(_destAddress, _maxDestAmount), "Could not transfer");
+        return _maxDestAmount;
     }
 
     function convertRate(
-        uint256 amount, 
-        uint256 rate, 
+        uint256 _amount, 
+        uint256 _rate, 
         address _srcToken, 
         address _destToken
-    ) 
+    )
     internal view returns (uint256) 
     {
         uint256 srcDecimals = decimals[_srcToken];
@@ -59,12 +59,13 @@ contract KyberMock is IKyberNetwork {
 
         if (_destToken == nchToken || _destToken == dclToken) {
             toDecimals = decimals[_destToken];
+            srcDecimals = 18;
         }
 
         if (toDecimals >= srcDecimals) {
-            return (amount * (rate * 10**(toDecimals - srcDecimals))) / 10**18;
+            return (_amount * (_rate * 10**(toDecimals - srcDecimals))) / 10**18;
         } else {
-            return (amount * rate) / 10**18 / 10**(srcDecimals - toDecimals);
+            return ((_amount * _rate / 10**18) / 10**(srcDecimals - toDecimals)) ;
         }
     }
 
@@ -80,5 +81,12 @@ contract KyberMock is IKyberNetwork {
             return (rate_MANA_DCL, rate_MANA_DCL);
         }
         revert("invalid rate");
+    }
+
+    function getReturn(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 
+        public view returns (uint256) {
+        uint256 rate;
+        (, rate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
+        return convertRate(_srcAmount, rate, _srcToken, _destToken);
     }
 }
