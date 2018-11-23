@@ -95,7 +95,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         int[] _ys, 
         address _beneficiary, 
         ERC20 _fromToken
-    ) external 
+    )
+        external 
     {
         _validateBidParameters(
             _xs, 
