@@ -585,6 +585,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           zeroAddress,
           landRegistry.address,
@@ -599,6 +602,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           0,
           landRegistry.address,
@@ -613,6 +619,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           owner,
           landRegistry.address,
@@ -629,6 +638,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -645,6 +657,9 @@ contract('LANDAuction', function([
         LANDAuction.new(
           time,
           prices,
+          farAwayStartTime,
+          landsLimitPerBid,
+          gasPriceLimit,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -665,8 +680,11 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
+          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
+          daiCharity.address,
+          tokenKiller.address,
           fromOwner
         )
       )
@@ -679,8 +697,11 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
+          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
+          daiCharity.address,
+          tokenKiller.address,
           fromOwner
         )
       )
@@ -695,8 +716,11 @@ contract('LANDAuction', function([
           0,
           gasPriceLimit,
           manaToken.address,
+          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
+          daiCharity.address,
+          tokenKiller.address,
           fromOwner
         )
       )
@@ -711,8 +735,11 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           0,
           manaToken.address,
+          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
+          daiCharity.address,
+          tokenKiller.address,
           fromOwner
         )
       )
@@ -1068,14 +1095,13 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time)
-      const totalPrice = price * xs.length
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
         logs[0].args._totalPriceInMana
       )
 
-      logs.length.should.be.equal(1)
+      logs.length.should.be.equal(3)
 
       assertEvent(
         normalizeEvent(logs[0]),
@@ -1083,7 +1109,9 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: daiToken.address,
-          _totalPriceInMana: totalPrice.toString(),
+          _totalPriceInMana: weiToDecimal(
+            getPriceWithLinearFunction(time, false) * xs.length
+          ).toString(),
           _totalPriceInToken: scientificToDecimal(totalPriceInToken),
           _tokensKept: '0'
         },
@@ -1550,8 +1578,11 @@ contract('LANDAuction', function([
         landsLimitPerBid,
         gasPriceLimit,
         manaToken.address,
+        daiToken.address,
         landRegistry.address,
         kyberConverter.address,
+        daiCharity.address,
+        tokenKiller.address,
         fromOwner
       )
 

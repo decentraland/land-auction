@@ -19,6 +19,9 @@ contract LANDAuctionTest is LANDAuction {
     ) public LANDAuction(
         _xPoints, 
         _yPoints, 
+        _startTime,
+        _landsLimitPerBid,
+        _gasPriceLimit,
         _manaToken,
         _daiToken,
         _landRegistry, 
