@@ -90,7 +90,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         emit AuctionCreated(
             msg.sender,
-            _startTime,
+            startTime,
             duration,
             initialPrice, 
             endPrice
@@ -345,9 +345,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         uint totalPriceWithDeposit = totalPrice.mul(conversionFee).div(100);
 
-        // Save prev _fromToken balance 
-        uint256 prevTokenBalance = _fromToken.balanceOf(address(this));
-
         // Get rate
         uint256 tokenRate = getRate(manaToken, _fromToken, totalPriceWithDeposit);
 
@@ -368,6 +365,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 totalPriceInToken
             );
          }
+        
 
         // Transfer _fromToken amount from sender to the contract
         require(
@@ -375,22 +373,21 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
         
+        // Calculate the total tokens to convert
+        uint256 totalTokensToConvert = totalPriceInToken.sub(tokensToKeep);
+
         // Approve amount of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.approve(address(dex), totalPriceInToken), "Error approve");
+        require(_fromToken.approve(address(dex), totalTokensToConvert), "Error approve");
 
         // Convert _fromToken to MANA
-        require(
-            dex.convert(
+        uint256 change = dex.convert(
                 _fromToken,
                 manaToken,
-                totalPriceInToken,
+                totalTokensToConvert,
                 totalPrice
-            ), 
-            "Could not convert tokens"
         );
 
        // Return change in _fromToken to sender
-        uint256 change = _fromToken.balanceOf(address(this)) - prevTokenBalance - tokensToKeep;
         if (change > 0) {
             // Return the change of src token
             require(
@@ -406,7 +403,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _bidId,
             address(_fromToken),
             totalPrice,
-            totalPriceInToken - change,
+            totalPriceInToken.sub(change),
             tokensToKeep
         );
     }
