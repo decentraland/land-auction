@@ -220,7 +220,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Check if contract should burn or transfer some tokens
         uint256 requiredTokenBalance = 0;
         
-        if (fromToken.shouldBurnFraction || fromToken.shouldForwardFraction) {
+        if (fromToken.shouldBurnTokens || fromToken.shouldForwardTokens) {
             requiredTokenBalance = _calculateRequiredTokenBalance(requiredManaAmountToBurn, tokenRate);
             requiredManaAmountToBurn = _calculateRequiredManaAmount(_bidPriceInMana);
         }
@@ -257,7 +257,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 _fromToken,
                 manaToken,
                 finalTokensToConvert,
-                totalPrice
+                requiredManaAmountToBurn
         );
 
        // Return change in _fromToken to sender
@@ -275,9 +275,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         emit BidConversion(
             _bidId,
             address(_fromToken),
-            totalPrice,
-            totalPriceInToken.sub(change),
-            tokensToKeep
+            requiredManaAmountToBurn,
+            tokensToConvertPlusSafetyMargin.sub(change),
+            requiredTokenBalance
         );
     }
 
@@ -337,10 +337,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _token - ERC20 token
     */
     function _processFunds(uint256 _bidId, ERC20 _token) internal {
-        if (tokensAllowed[address(_token)].shouldBurnFraction) {
+        if (tokensAllowed[address(_token)].shouldBurnTokens) {
             _burnToken(_bidId, _token);
         }
-        if (tokensAllowed[address(_token)].shouldForwardFraction) {
+        if (tokensAllowed[address(_token)].shouldForwardTokens) {
             _forwardToken(_bidId, tokensAllowed[address(_token)].forwardTarget, _token);
         }    
     }
@@ -471,10 +471,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function allowToken(
         uint256 decimals,
 
-        bool shouldForwardFraction,
+        bool shouldForwardTokens,
         address forwardTarget,
 
-        bool shouldBurnFraction
+        bool shouldBurnTokens
     ) 
         public onlyOwner 
     {
@@ -490,8 +490,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         tokensAllowed[_address] = Token({
             decimals: _decimals,
-            shouldForwardFraction: _shouldForwardFraction,
-            shouldBurnFraction: _shouldBurnFraction,
+            shouldForwardTokens: _shouldForwardTokens,
+            shouldBurnTokens: _shouldBurnTokens,
             forwardTarget: _forwardTarget,
             isAllowed: true
         });

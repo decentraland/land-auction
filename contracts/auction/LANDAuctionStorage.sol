@@ -31,14 +31,14 @@ contract LANDAuctionStorage {
         uint256 base;
         uint256 limit;
     }
-    
+
     struct Token {
         uint256 decimals;
 
-        bool shouldForwardFraction;
-        address forwardTarget;
+        bool shouldBurnTokens;
 
-        bool shouldBurnFraction;
+        bool shouldForwardTokens;
+        address forwardTarget;
 
         bool isAllowed;
     }
