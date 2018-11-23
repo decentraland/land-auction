@@ -540,9 +540,8 @@ contract('LANDAuction', function([
     it('reverts if creator creates with incorrect values :: daiToken not a valid contract address', async function() {
       await assertRevert(
         LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
+          time,
+          prices,
           manaToken.address,
           zeroAddress,
           landRegistry.address,
@@ -555,9 +554,8 @@ contract('LANDAuction', function([
 
       await assertRevert(
         LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
+          time,
+          prices,
           manaToken.address,
           0,
           landRegistry.address,
@@ -570,9 +568,8 @@ contract('LANDAuction', function([
 
       await assertRevert(
         LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
+          time,
+          prices,
           manaToken.address,
           owner,
           landRegistry.address,
@@ -587,9 +584,8 @@ contract('LANDAuction', function([
     it('reverts if instanciate with incorrect values :: daiCharity not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
+          time,
+          prices,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -604,9 +600,8 @@ contract('LANDAuction', function([
     it('reverts if instanciate with incorrect values :: tokenKiller not a contract address', async function() {
       await assertRevert(
         LANDAuction.new(
-          initialPrice,
-          endPrice,
-          auctionDuration,
+          time,
+          prices,
           manaToken.address,
           daiToken.address,
           landRegistry.address,
@@ -847,7 +842,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: manaToken.address,
-          _total: logs[1].args._totalPrice.toString()
+          _total: scientificToDecimal(logs[1].args._totalPrice)
         },
         true
       )
@@ -888,7 +883,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: manaToken.address,
-          _total: res.logs[1].args._totalPrice.toString()
+          _total: scientificToDecimal(res.logs[1].args._totalPrice)
         },
         true
       )
@@ -913,7 +908,7 @@ contract('LANDAuction', function([
         {
           _bidId: '1',
           _token: manaToken.address,
-          _total: res.logs[1].args._totalPrice.toString()
+          _total: scientificToDecimal(res.logs[1].args._totalPrice)
         },
         true
       )
@@ -938,7 +933,7 @@ contract('LANDAuction', function([
         {
           _bidId: '2',
           _token: manaToken.address,
-          _total: res.logs[1].args._totalPrice.toString()
+          _total: scientificToDecimal(res.logs[1].args._totalPrice)
         },
         true
       )
@@ -1072,7 +1067,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: manaToken.address,
-          _total: logs[0].args._totalPriceInMana.toString()
+          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
         },
         true
       )
@@ -1150,7 +1145,6 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - initialTime
       const price = getPriceWithLinearFunction(time - initialTime)
-      const totalPrice = price * xs.length
 
       // add 1 cause we do the same in the contract to ensure the min MANA to buy
       // when dealing with tokens with less decimals than MANA
@@ -1166,7 +1160,9 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: dclToken.address,
-          _totalPriceInMana: totalPrice.toString(),
+          _totalPriceInMana: weiToDecimal(
+            getPriceWithLinearFunction(time, false) * xs.length
+          ).toString(),
           _totalPriceInToken: totalPriceInToken.toString(),
           _tokensKept: '0'
         },
@@ -1179,7 +1175,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: manaToken.address,
-          _total: logs[0].args._totalPriceInMana.toString()
+          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
         },
         true
       )
@@ -1272,7 +1268,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: daiToken.address,
-          _total: logs[0].args._tokensKept.toString()
+          _total: scientificToDecimal(logs[0].args._tokensKept)
         },
         true
       )
@@ -1283,7 +1279,7 @@ contract('LANDAuction', function([
         {
           _bidId: '0',
           _token: manaToken.address,
-          _total: logs[0].args._totalPriceInMana.toString()
+          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
         },
         true
       )

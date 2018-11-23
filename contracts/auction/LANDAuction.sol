@@ -493,62 +493,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         _burnToken(_bidId, manaToken);       
     }
 
-    
-    /** 
-    * @dev Burn tokens. 
-    * Note that if the token is the DAI token we will transfer the funds 
-    * to the DAI charity contract.
-    * For the rest of the tokens if not implement the burn method 
-    * we will transfer the funds to a token killer address
-    * @param _bidId - uint256 of the bid Id
-    * @param _token - ERC20 token
-    */
-    function _burnToken(uint256 _bidId, ERC20 _token) private {
-        uint256 balance = _token.balanceOf(address(this));
-
-        // Check if balance is valid
-        require(balance > 0, "Balance to burn should be > 0");
-
-        if(_token == daiToken) {
-            // Transfer to DAI charity if token to burn is DAI
-            require(
-                _token.transfer(daiCharity, balance),
-                "Could not transfer tokens to DAI charity" 
-            );
-        } else {
-            // Burn funds
-            bool result = _safeBurn(_token, balance);
-
-            if (!result) {
-                // If token does not implement burn method suicide tokens
-                require(
-                    _token.transfer(tokenKiller, balance),
-                    "Could not transfer tokens to the token killer contract" 
-                );
-            }
-        }
-
-        emit TokenBurned(_bidId, address(_token), balance);
-
-        // Check if balance of the auction contract is empty
-        balance = _token.balanceOf(address(this));
-        require(balance == 0, "Burn token failed");
-    }
-
-    /** 
-    * @dev Execute burn method. 
-    * Note that if the contract does not implement it will return false
-    * @param _token - ERC20 token
-    * @param _amount - uint256 of the amount to burn
-    * @return bool if burn has been successfull
-    */
-    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
-        success = address(_token).call(abi.encodeWithSelector(
-            _token.burn.selector,
-            _amount
-        ));        
-    }
-
     /** 
     * @dev Create a combined function.
     * note that we will set N - 1 function combinations based on N points (x,y)
@@ -602,7 +546,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Calculate base and slope for the given points
     * It is a linear function y = ax - b. But The slope should be negative.
-    * As Solidity does not support negative number we use it as: y = b - ax
+    * As we want to avoid negative numbers in favor of using uints we use it as: y = b - ax
     * Based on two points (x1; x2) and (y1; y2)
     * base = (x2 * y1) - (x1 * y2) / x2 - x1
     * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
@@ -623,7 +567,62 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         base = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
         slope = (_y1.sub(_y2)).div(_x2.sub(_x1));
     }
-    
+
+    /** 
+    * @dev Burn tokens. 
+    * Note that if the token is the DAI token we will transfer the funds 
+    * to the DAI charity contract.
+    * For the rest of the tokens if not implement the burn method 
+    * we will transfer the funds to a token killer address
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnToken(uint256 _bidId, ERC20 _token) private {
+        uint256 balance = _token.balanceOf(address(this));
+
+        // Check if balance is valid
+        require(balance > 0, "Balance to burn should be > 0");
+
+        if (_token == daiToken) {
+            // Transfer to DAI charity if token to burn is DAI
+            require(
+                _token.transfer(daiCharity, balance),
+                "Could not transfer tokens to DAI charity" 
+            );
+        } else {
+            // Burn funds
+            bool result = _safeBurn(_token, balance);
+
+            if (!result) {
+                // If token does not implement burn method suicide tokens
+                require(
+                    _token.transfer(tokenKiller, balance),
+                    "Could not transfer tokens to the token killer contract" 
+                );
+            }
+        }
+
+        emit TokenBurned(_bidId, address(_token), balance);
+
+        // Check if balance of the auction contract is empty
+        balance = _token.balanceOf(address(this));
+        require(balance == 0, "Burn token failed");
+    }
+
+    /** 
+    * @dev Execute burn method. 
+    * Note that if the contract does not implement it will return false
+    * @param _token - ERC20 token
+    * @param _amount - uint256 of the amount to burn
+    * @return bool if burn has been successfull
+    */
+    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
+        success = address(_token).call(abi.encodeWithSelector(
+            _token.burn.selector,
+            _amount
+        ));        
+    }
+
     /**
     * @dev Return bid id
     * @return uint256 of the bid id
