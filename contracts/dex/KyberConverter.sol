@@ -24,7 +24,7 @@ contract KyberConverter is ITokenConverter {
         uint256 _srcAmount,
         uint256 _destAmount
     ) 
-    external payable returns (bool)
+    external payable returns (uint256)
     {
         // Save prev src token balance 
         uint256 prevSrcBalance = _srcToken.balanceOf(address(this));
@@ -78,7 +78,7 @@ contract KyberConverter is ITokenConverter {
             "Could not transfer amount of _destToken to msg.sender"
         );
 
-        return true;
+        return change;
     }
 
     function getExpectedRate(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 

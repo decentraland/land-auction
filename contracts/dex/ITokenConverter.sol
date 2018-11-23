@@ -13,14 +13,14 @@ contract ITokenConverter {
     * @param _destToken - IERC20 token 
     * @param _srcAmount - uint256 amount to be converted
     * @param _destAmount - uint256 amount to get after convertion
-    * @return bool true if the convertion was success
+    * @return uint256 for the change. 0 if there is no change
     */
     function convert(
         IERC20 _srcToken,
         IERC20 _destToken,
         uint256 _srcAmount,
         uint256 _destAmount
-        ) external payable returns (bool);
+        ) external payable returns (uint256);
 
     /**
     * @dev Get exchange rate and slippage rate. 
