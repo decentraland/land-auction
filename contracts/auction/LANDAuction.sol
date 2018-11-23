@@ -506,8 +506,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         tokensAllowed[_address] = Token({
             decimals: _decimals,
-            shouldForwardTokens: _shouldForwardTokens,
             shouldBurnTokens: _shouldBurnTokens,
+            shouldForwardTokens: _shouldForwardTokens,
             forwardTarget: _forwardTarget,
             isAllowed: true
         });
@@ -516,8 +516,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             msg.sender, 
             _address, 
             _decimals,
-            _shouldForwardTokens,
             _shouldBurnTokens,
+            _shouldForwardTokens,
             _forwardTarget
         );
     }
