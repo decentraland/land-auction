@@ -26,6 +26,11 @@ contract LANDAuctionStorage {
 
     enum Status { created, started, finished }
 
+    struct Func {
+        uint256 slope;
+        uint256 base;
+        uint256 limit;
+    }
     struct Token {
         uint256 decimals;
         bool shouldKeepToken;
@@ -41,6 +46,7 @@ contract LANDAuctionStorage {
     LANDRegistry public landRegistry;
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
+    Func[] internal curves;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
