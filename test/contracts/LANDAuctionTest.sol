@@ -11,11 +11,8 @@ contract LANDAuctionTest is LANDAuction {
         uint256 _landsLimitPerBid,
         uint256 _gasPriceLimit,
         ERC20 _manaToken, 
-        ERC20 _daiToken,
         LANDRegistry _landRegistry,
-        address _dex,
-        address _daiCharity,
-        address _tokenKiller
+        address _dex
     ) public LANDAuction(
         _xPoints, 
         _yPoints, 
@@ -23,11 +20,8 @@ contract LANDAuctionTest is LANDAuction {
         _landsLimitPerBid,
         _gasPriceLimit,
         _manaToken,
-        _daiToken,
         _landRegistry, 
-        _dex, 
-        _daiCharity,
-        _tokenKiller
+        _dex
     ) {}
 
     function getPrice(uint256 _value) public view returns (uint256) {

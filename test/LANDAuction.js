@@ -267,14 +267,20 @@ contract('LANDAuction', function([
       landsLimitPerBid,
       gasPriceLimit,
       manaToken.address,
-      daiToken.address,
       landRegistry.address,
       kyberConverter.address,
-      daiCharity.address,
-      tokenKiller.address,
       fromOwner
     )
+
     const logs = await getEvents(landAuction, 'AuctionCreated')
+    await landAuction.allowToken(
+      daiToken.address,
+      MAX_DECIMALS,
+      false,
+      true,
+      daiCharity.address,
+      fromOwner
+    )
 
     // Assign balance to bidders and allow LANDAuction to move MANA
     await manaToken.setBalance(web3.toWei(10000000, 'ether'), fromBidder)
@@ -344,11 +350,8 @@ contract('LANDAuction', function([
         landsLimitPerBid,
         gasPriceLimit,
         manaToken.address,
-        daiToken.address,
         landRegistry.address,
         kyberConverter.address,
-        daiCharity.address,
-        tokenKiller.address,
         fromOwner
       )
 
@@ -363,16 +366,11 @@ contract('LANDAuction', function([
       })
 
       logs = await getEvents(_landAuction, 'TokenAllowed')
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
 
       assertEvent(logs[0], 'TokenAllowed', {
         _caller: owner,
         _address: manaToken.address
-      })
-
-      assertEvent(logs[1], 'TokenAllowed', {
-        _caller: owner,
-        _address: daiToken.address
       })
 
       const currentLANDPrice = await _landAuction.getCurrentPrice()
@@ -390,11 +388,8 @@ contract('LANDAuction', function([
         landsLimitPerBid,
         gasPriceLimit,
         manaToken.address,
-        daiToken.address,
         landRegistry.address,
         kyberConverter.address,
-        daiCharity.address,
-        tokenKiller.address,
         fromOwner
       )
     })
@@ -408,11 +403,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -427,11 +419,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -446,11 +435,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -465,11 +451,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           zeroAddress,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -482,11 +465,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           0,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -499,11 +479,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           owner,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -518,11 +495,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           zeroAddress,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -535,11 +509,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           0,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -552,11 +523,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           owner,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -571,101 +539,7 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
-          bidder,
-          daiCharity.address,
-          tokenKiller.address,
-          fromOwner
-        )
-      )
-    })
-
-    it('reverts if creator creates with incorrect values :: daiToken not a valid contract address', async function() {
-      await assertRevert(
-        LANDAuction.new(
-          time,
-          prices,
-          farAwayStartTime,
-          landsLimitPerBid,
-          gasPriceLimit,
-          manaToken.address,
-          zeroAddress,
-          landRegistry.address,
-          kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
-          fromOwner
-        )
-      )
-
-      await assertRevert(
-        LANDAuction.new(
-          time,
-          prices,
-          farAwayStartTime,
-          landsLimitPerBid,
-          gasPriceLimit,
-          manaToken.address,
-          0,
-          landRegistry.address,
-          kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
-          fromOwner
-        )
-      )
-
-      await assertRevert(
-        LANDAuction.new(
-          time,
-          prices,
-          farAwayStartTime,
-          landsLimitPerBid,
-          gasPriceLimit,
-          manaToken.address,
-          owner,
-          landRegistry.address,
-          kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
-          fromOwner
-        )
-      )
-    })
-
-    it('reverts if instanciate with incorrect values :: daiCharity not a contract address', async function() {
-      await assertRevert(
-        LANDAuction.new(
-          time,
-          prices,
-          farAwayStartTime,
-          landsLimitPerBid,
-          gasPriceLimit,
-          manaToken.address,
-          daiToken.address,
-          landRegistry.address,
-          kyberConverter.address,
-          bidder,
-          daiCharity.address,
-          fromOwner
-        )
-      )
-    })
-
-    it('reverts if instanciate with incorrect values :: tokenKiller not a contract address', async function() {
-      await assertRevert(
-        LANDAuction.new(
-          time,
-          prices,
-          farAwayStartTime,
-          landsLimitPerBid,
-          gasPriceLimit,
-          manaToken.address,
-          daiToken.address,
-          landRegistry.address,
-          kyberConverter.address,
-          daiCharity.address,
           bidder,
           fromOwner
         )
@@ -681,11 +555,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -698,11 +569,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -717,11 +585,8 @@ contract('LANDAuction', function([
           0,
           gasPriceLimit,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -736,11 +601,8 @@ contract('LANDAuction', function([
           landsLimitPerBid,
           0,
           manaToken.address,
-          daiToken.address,
           landRegistry.address,
           kyberConverter.address,
-          daiCharity.address,
-          tokenKiller.address,
           fromOwner
         )
       )
@@ -1040,7 +902,14 @@ contract('LANDAuction', function([
     it('should bid with other tokens', async function() {
       // Remove keep of percentage from DAI
       await landAuction.disableToken(daiToken.address, fromOwner)
-      await landAuction.allowToken(daiToken.address, 18, false, fromOwner)
+      await landAuction.allowToken(
+        daiToken.address,
+        MAX_DECIMALS,
+        false,
+        false,
+        zeroAddress,
+        fromOwner
+      )
 
       // Get prev balance of bidder of DAI token
       const bidderDAIPrevBalance = await daiToken.balanceOf(bidderWithOnlyDAI)
@@ -1133,10 +1002,12 @@ contract('LANDAuction', function([
 
     it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
       // Allow token
-      await landAuction.allowManyTokens(
-        [dclToken.address],
-        [SPECIAL_DECIMALS],
-        [false],
+      await landAuction.allowToken(
+        dclToken.address,
+        SPECIAL_DECIMALS,
+        false,
+        false,
+        0,
         fromOwner
       )
 
@@ -1154,8 +1025,6 @@ contract('LANDAuction', function([
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time)
 
-      // add 1 cause we do the same in the contract to ensure the min MANA to buy
-      // when dealing with tokens with less decimals than MANA
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
@@ -1250,9 +1119,10 @@ contract('LANDAuction', function([
         _tokensKept: tokensKept.toFixed(0) // remove decimal
       })
 
-      assertEvent(logs[1], 'TokenBurned', {
+      assertEvent(logs[1], 'TokenTransferred', {
         _bidId: '0',
         _token: daiToken.address,
+        _to: daiCharity.address,
         _total: scientificToDecimal(logs[0].args._tokensKept)
       })
 
@@ -1291,11 +1161,13 @@ contract('LANDAuction', function([
       )
     })
 
-    it('should bid and transfer funds if token does not implement burn', async function() {
-      await landAuction.allowManyTokens(
-        [dclToken.address],
-        [SPECIAL_DECIMALS],
-        [true],
+    it('should bid and forward funds', async function() {
+      await landAuction.allowToken(
+        dclToken.address,
+        SPECIAL_DECIMALS,
+        false,
+        true,
+        tokenKiller.address,
         fromOwner
       )
 
@@ -1494,11 +1366,8 @@ contract('LANDAuction', function([
         landsLimitPerBid,
         gasPriceLimit,
         manaToken.address,
-        daiToken.address,
         landRegistry.address,
         kyberConverter.address,
-        daiCharity.address,
-        tokenKiller.address,
         fromOwner
       )
 
@@ -1548,108 +1417,30 @@ contract('LANDAuction', function([
     })
   })
 
-  describe('allowManyTokens', function() {
-    it('should allowManyTokens', async function() {
-      const erc20 = await ERC20Token.new(creationParams)
-
-      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
-      isAllowed.should.be.equal(false)
-
-      isAllowed = (await landAuction.tokensAllowed(dclToken.address))[2]
-      isAllowed.should.be.equal(false)
-
-      const { logs } = await landAuction.allowManyTokens(
-        [dclToken.address, erc20.address],
-        [MAX_DECIMALS, SPECIAL_DECIMALS],
-        [true, false],
-        fromOwner
-      )
-
-      assertEvent(logs[0], 'TokenAllowed', {
-        _caller: owner,
-        _address: dclToken.address,
-        _decimals: MAX_DECIMALS.toString(),
-        _shouldKeepToken: true
-      })
-
-      assertEvent(logs[1], 'TokenAllowed', {
-        _caller: owner,
-        _address: erc20.address,
-        _decimals: SPECIAL_DECIMALS.toString(),
-        _shouldKeepToken: false
-      })
-
-      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
-      isAllowed.should.be.equal(true)
-
-      isAllowed = (await landAuction.tokensAllowed(dclToken.address))[2]
-      isAllowed.should.be.equal(true)
-    })
-
-    it('reverts when allow tokens with invalid parameteres:: not the same length', async function() {
-      await assertRevert(
-        landAuction.allowManyTokens(
-          [dclToken.address],
-          [MAX_DECIMALS, SPECIAL_DECIMALS],
-          [false],
-          fromOwner
-        )
-      )
-
-      await assertRevert(
-        landAuction.allowManyTokens(
-          [dclToken.address],
-          [MAX_DECIMALS],
-          [false, true],
-          fromOwner
-        )
-      )
-
-      const erc20 = await ERC20Token.new(creationParams)
-      await assertRevert(
-        landAuction.allowManyTokens(
-          [erc20.address, dclToken.address],
-          [MAX_DECIMALS],
-          [false],
-          fromOwner
-        )
-      )
-    })
-
-    it('reverts when no-owner try to change it', async function() {
-      await assertRevert(
-        landAuction.allowManyTokens(
-          [dclToken.address],
-          [MAX_DECIMALS],
-          [false],
-          fromHacker
-        )
-      )
-    })
-  })
-
   describe('allowToken', function() {
     it('should allowToken', async function() {
       const erc20 = await ERC20Token.new(creationParams)
 
-      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[4]
       isAllowed.should.be.equal(false)
 
       const { logs } = await landAuction.allowToken(
         erc20.address,
         MAX_DECIMALS,
         false,
+        false,
+        0,
         fromOwner
       )
 
       assertEvent(logs[0], 'TokenAllowed', {
         _caller: owner,
         _address: erc20.address,
-        _decimals: MAX_DECIMALS.toString(),
-        _shouldKeepToken: false
+        _decimals: MAX_DECIMALS.toString()
+        //_shouyld: false
       })
 
-      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed = (await landAuction.tokensAllowed(erc20.address))[4]
       isAllowed.should.be.equal(true)
     })
 
@@ -1659,6 +1450,8 @@ contract('LANDAuction', function([
           manaToken.address,
           MAX_DECIMALS,
           false,
+          false,
+          0,
           fromOwner
         )
       )
@@ -1666,16 +1459,16 @@ contract('LANDAuction', function([
 
     it('reverts when trying to allow not a contract', async function() {
       await assertRevert(
-        landAuction.allowToken(bidder, MAX_DECIMALS, false, fromOwner)
+        landAuction.allowToken(bidder, MAX_DECIMALS, false, false, 0, fromOwner)
       )
       await assertRevert(
-        landAuction.allowToken(0, MAX_DECIMALS, false, fromOwner)
+        landAuction.allowToken(0, MAX_DECIMALS, false, false, 0, fromOwner)
       )
     })
 
     it('reverts when trying to allow a token with invalid decimals', async function() {
       await assertRevert(
-        landAuction.allowToken(daiToken.address, 0, false, fromOwner)
+        landAuction.allowToken(daiToken.address, 0, false, false, 0, fromOwner)
       )
 
       await assertRevert(
@@ -1683,6 +1476,8 @@ contract('LANDAuction', function([
           daiToken.address,
           MAX_DECIMALS + 1,
           false,
+          false,
+          0,
           fromOwner
         )
       )
@@ -1691,7 +1486,14 @@ contract('LANDAuction', function([
     it('reverts when no-owner try to change it', async function() {
       const erc20 = await ERC20Token.new(creationParams)
       await assertRevert(
-        landAuction.allowToken(erc20.address, MAX_DECIMALS, false, fromHacker)
+        landAuction.allowToken(
+          erc20.address,
+          MAX_DECIMALS,
+          false,
+          false,
+          0,
+          fromHacker
+        )
       )
     })
   })
@@ -1704,9 +1506,11 @@ contract('LANDAuction', function([
         erc20.address,
         MAX_DECIMALS,
         false,
+        false,
+        0,
         fromOwner
       )
-      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      let isAllowed = (await landAuction.tokensAllowed(erc20.address))[4]
       isAllowed.should.be.equal(true)
 
       const { logs } = await landAuction.disableToken(erc20.address, fromOwner)
@@ -1716,7 +1520,7 @@ contract('LANDAuction', function([
         _address: erc20.address
       })
 
-      isAllowed = (await landAuction.tokensAllowed(erc20.address))[2]
+      isAllowed = (await landAuction.tokensAllowed(erc20.address))[4]
       isAllowed.should.be.equal(false)
     })
 
