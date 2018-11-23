@@ -30,12 +30,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 _startTime,
         uint256 _landsLimitPerBid,
         uint256 _gasPriceLimit,
-        ERC20 _manaToken, 
-        ERC20 _daiToken,
+        ERC20 _manaToken,
         LANDRegistry _landRegistry,
-        address _dex,
-        address _daiCharity,
-        address _tokenKiller
+        address _dex
     ) public {
         // Initialize owneable
         Ownable.initialize(msg.sender);
@@ -51,28 +48,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
-        require(
-            address(_daiCharity).isContract(),
-            "The DAI Charity token address must be a deployed contract"
-        );
-        daiCharity = _daiCharity;
-
-        require(
-            address(_tokenKiller).isContract(),
-            "The Token Killer must be a deployed contract"
-        );
-        tokenKiller = _tokenKiller;
-
-
         setDex(_dex);
 
         // Set MANAToken
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
-
-        // Allow DAI and keep tokens
-        allowToken(address(_daiToken), 18, true);
-        daiToken = _daiToken;
 
         // Set total duration of the auction
         duration = _xPoints[_xPoints.length - 1];
@@ -137,8 +117,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             );
         }
 
-        // Burn Transferred funds
-        _burnFunds(bidId, _fromToken);
+        // Process funds
+        _processFunds(bidId, _fromToken);
 
         // Assign LANDs to _beneficiary
         for (uint i = 0; i < _xs.length; i++) {
@@ -161,28 +141,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Increment bids count
         _incrementBids();
-    }
-
-    /**
-    * @dev Allow many ERC20 tokens to to be used for bidding
-    * @param _address - array of addresses of the ERC20 Token
-    * @param _decimals - array of uint256 of the number of decimals
-    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
-    */
-    function allowManyTokens(
-        address[] _address, 
-        uint256[] _decimals, 
-        bool[] _shouldKeepToken
-    ) external onlyOwner
-    {
-        require(
-            _address.length == _decimals.length && _decimals.length == _shouldKeepToken.length,
-            "The length of _addresses, decimals and _shouldKeepToken should be the same"
-        );
-
-        for (uint i = 0; i < _address.length; i++) {
-            allowToken(_address[i], _decimals[i], _shouldKeepToken[i]);
-        }
     }
 
     /**
@@ -267,10 +225,14 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _shouldKeepToken - boolean whether we should keep the token or not
     */
     function allowToken(
-        address _address, 
-        uint256 _decimals, 
-        bool _shouldKeepToken) 
-    public onlyOwner 
+        uint256 decimals,
+
+        bool shouldForwardFraction,
+        address forwardTarget,
+
+        bool shouldBurnFraction
+    ) 
+        public onlyOwner 
     {
         require(
             _address.isContract(),
@@ -284,15 +246,16 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         tokensAllowed[_address] = Token({
             decimals: _decimals,
-            shouldKeepToken: _shouldKeepToken,
+            shouldForwardFraction: _shouldForwardFraction,
+            shouldBurnFraction: _shouldBurnFraction,
+            forwardTarget: _forwardTarget,
             isAllowed: true
         });
 
         emit TokenAllowed(
             msg.sender, 
             _address, 
-            _decimals, 
-            _shouldKeepToken
+            _decimals,
         );
     }
 
@@ -348,33 +311,35 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Get rate
         uint256 tokenRate = getRate(manaToken, _fromToken, totalPriceWithDeposit);
 
-        // Check if contract should keep a percentage of _fromToken
-        uint256 tokensToKeep = 0;
-        if (fromToken.shouldKeepToken) {
-            (tokensToKeep, totalPrice) = _calculateTokensToKeep(totalPrice, tokenRate);
+        // Check if contract should burn or transfer some tokens
+        uint256 externalTokenRequiredBalance = 0;
+        if (fromToken.shouldBurnFraction || fromToken.shouldForwardFraction) {
+            (externalTokenRequiredBalance, totalPrice) = _calculateTokensToKeep(totalPrice, tokenRate);
         }
 
-        // Calculate the amount of _fromToken needed
+        // Calculate the amount of _fromToken to be converted
         uint256 totalPriceInToken = totalPriceWithDeposit.mul(tokenRate).div(10 ** 18);
 
         // Normalize to _fromToken decimals
         if (MAX_DECIMALS > fromToken.decimals) {
-            (tokensToKeep, totalPriceInToken) = _normalizeDecimals(
+            externalTokenRequiredBalance = _normalizeDecimals(
                 fromToken.decimals, 
-                tokensToKeep, 
+                externalTokenRequiredBalance
+            );
+            totalPriceInToken = _normalizeDecimals(
+                fromToken.decimals,
                 totalPriceInToken
             );
-         }
-        
+        }
 
-        // Transfer _fromToken amount from sender to the contract
+        // Retrieve tokens from the sender to this contract
         require(
             _fromToken.transferFrom(msg.sender, address(this), totalPriceInToken),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
         
         // Calculate the total tokens to convert
-        uint256 totalTokensToConvert = totalPriceInToken.sub(tokensToKeep);
+        uint256 totalTokensToConvert = totalPriceInToken.sub(externalTokenRequiredBalance);
 
         // Approve amount of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), totalTokensToConvert), "Error approve");
@@ -431,21 +396,14 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @dev Normalize to _fromToken decimals
     * @param _decimals - uint256 of _fromToken decimals
     * @param _tokensToKeep - uint256 of the amount of tokens to keep
-    * @param _totalPriceInToken - uint256 of the amount of _fromToken
-    * @return tokensToKeep - uint256 of the amount of tokens to keep in _fromToken decimals
-    * @return totalPriceInToken - address beneficiary for the LANDs to bid in _fromToken decimals
     */
     function _normalizeDecimals(
         uint256 _decimals, 
-        uint256 _tokensToKeep, 
-        uint256 _totalPriceInToken
+        uint256 _value
     ) 
-    internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken) 
+    internal pure returns uint256 (_value) 
     {
-        uint256 newDecimals = 10**MAX_DECIMALS.sub(_decimals);
-
-        totalPriceInToken = _totalPriceInToken.div(newDecimals);
-        tokensToKeep = _tokensToKeep.div(newDecimals);
+        _value = _value.div(10**MAX_DECIMALS.sub(_decimals));
     }
 
     /** 
@@ -567,11 +525,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /** 
-    * @dev Burn tokens. 
-    * Note that if the token is the DAI token we will transfer the funds 
-    * to the DAI charity contract.
-    * For the rest of the tokens if not implement the burn method 
-    * we will transfer the funds to a token killer address
+    * @dev Burn tokens
+    *
     * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
@@ -580,27 +535,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Check if balance is valid
         require(balance > 0, "Balance to burn should be > 0");
+        
+        address(_token).call(abi.encodeWithSelector(
+            _token.burn.selector,
+            _amount
+        ));
 
-        if (_token == daiToken) {
-            // Transfer to DAI charity if token to burn is DAI
-            require(
-                _token.transfer(daiCharity, balance),
-                "Could not transfer tokens to DAI charity" 
-            );
-        } else {
-            // Burn funds
-            bool result = _safeBurn(_token, balance);
-
-            if (!result) {
-                // If token does not implement burn method suicide tokens
-                require(
-                    _token.transfer(tokenKiller, balance),
-                    "Could not transfer tokens to the token killer contract" 
-                );
-            }
-        }
-
-        emit TokenBurned(_bidId, address(_token), balance);
+        emit TokenProcessed(_bidId, address(_token), balance);
 
         // Check if balance of the auction contract is empty
         balance = _token.balanceOf(address(this));
@@ -608,17 +549,25 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /** 
-    * @dev Execute burn method. 
-    * Note that if the contract does not implement it will return false
+    * @dev Transfer tokens
+    *
+    * @param _bidId - uint256 of the bid Id
+    * @param _address - address to send the tokens to
     * @param _token - ERC20 token
-    * @param _amount - uint256 of the amount to burn
-    * @return bool if burn has been successfull
     */
-    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
-        success = address(_token).call(abi.encodeWithSelector(
-            _token.burn.selector,
-            _amount
-        ));        
+    function _transferTokens(uint256 _bidId, address _address, ERC20 _token) private {
+        uint256 balance = _token.balanceOf(address(this));
+
+        // Check if balance is valid
+        require(balance > 0, "Balance to burn should be > 0");
+        
+        _token.transfer(_address, balance);
+
+        emit TokenProcessed(_bidId, address(_token), balance);
+
+        // Check if balance of the auction contract is empty
+        balance = _token.balanceOf(address(this));
+        require(balance == 0, "Transfer token failed");
     }
 
     /**
