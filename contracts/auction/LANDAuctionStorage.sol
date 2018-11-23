@@ -124,8 +124,8 @@ contract LANDAuctionStorage {
       address indexed _caller,
       address indexed _address,
       uint256 _decimals,
-      bool _shouldForwardTokens,
       bool _shouldBurnTokens,
+      bool _shouldForwardTokens,
       address indexed _forwardTarget
     );
 

@@ -100,7 +100,7 @@ function assertEvent(log, expectedEventName, expectedArgs) {
         }
       } else {
         if (value instanceof BigNumber) {
-          value = scientificToDecimal(value.toString()).toString()
+          value = scientificToDecimal(value.toString())
         }
 
         value.should.be.equal(expectedArgs[key], `[assertEvent] ${key}`)
@@ -655,126 +655,6 @@ contract('LANDAuction', function([
       balance.should.be.bignumber.equal(0)
     })
 
-    it('should increase bid id', async function() {
-      let res = await landAuction.bid(xs, ys, bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-      assertEvent(res.logs[0], 'TokenBurned', {
-        _bidId: '0',
-        _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
-      })
-
-      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
-        _bidId: '0',
-        _xs: xs,
-        _ys: ys
-      })
-
-      res = await landAuction.bid([10], [11], bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      assertEvent(res.logs[0], 'TokenBurned', {
-        _bidId: '1',
-        _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
-      })
-
-      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
-        _bidId: '1',
-        _xs: [10],
-        _ys: [11]
-      })
-
-      res = await landAuction.bid([12], [13], bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      assertEvent(res.logs[0], 'TokenBurned', {
-        _bidId: '2',
-        _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
-      })
-
-      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
-        _bidId: '2',
-        _xs: [12],
-        _ys: [13]
-      })
-    })
-
-    it('should keep balance of LANDAuction contract at 0', async function() {
-      await landAuction.bid(xs, ys, bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      await landAuction.bid([5], [5], anotherBidder, manaToken.address, {
-        ...fromAnotherBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      await landAuction.bid([6], [6], bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      const balance = await manaToken.balanceOf(landAuction.address)
-      balance.should.be.bignumber.equal(0)
-
-      let id = await landRegistry._encodeTokenId(5, 5)
-      let address = await landRegistry.ownerOf(id)
-      address.should.be.equal(anotherBidder)
-
-      id = await landRegistry._encodeTokenId(6, 6)
-      address = await landRegistry.ownerOf(id)
-      address.should.be.equal(bidder)
-
-      for (let i = 0; i < xs.length; i++) {
-        id = await landRegistry._encodeTokenId(xs[i], ys[i])
-        address = await landRegistry.ownerOf(id)
-        address.should.be.equal(bidder)
-      }
-    })
-
-    it('should assign LANDs to beneficiary', async function() {
-      await landAuction.bid(xs, ys, anotherBidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-
-      for (let i = 0; i < xs.length; i++) {
-        const id = await landRegistry._encodeTokenId(xs[i], ys[i])
-        const address = await landRegistry.ownerOf(id)
-        address.should.be.equal(anotherBidder)
-      }
-    })
-
-    it('should bid limit LANDs', async function() {
-      await landAuction.bid(
-        [-150, 150],
-        [-150, 150],
-        bidder,
-        manaToken.address,
-        {
-          ...fromBidder,
-          gasPrice: gasPriceLimit
-        }
-      )
-    })
-
-    it('should bid with MANA token without dex', async function() {
-      await landAuction.setDex(0, fromOwner)
-      await landAuction.bid(xs, ys, bidder, manaToken.address, {
-        ...fromBidder,
-        gasPrice: gasPriceLimit
-      })
-    })
-
     it('should bid with other tokens', async function() {
       // Remove keep of percentage from DAI
       await landAuction.disableToken(daiToken.address, fromOwner)
@@ -952,7 +832,18 @@ contract('LANDAuction', function([
       bidderMANABalance.should.be.bignumber.gte(web3.toWei(10, 'ether'))
     })
 
-    it('should bid and keep a percentage of the token', async function() {
+    it('should bid and burn tokens', async function() {
+      // Should burn DAI
+      await landAuction.disableToken(daiToken.address, fromOwner)
+      await landAuction.allowToken(
+        daiToken.address,
+        MAX_DECIMALS,
+        true,
+        false,
+        zeroAddress,
+        fromOwner
+      )
+
       // Get prev balance of bidder of DAI token
       const bidderDAIPrevBalance = await daiToken.balanceOf(bidder)
 
@@ -995,10 +886,9 @@ contract('LANDAuction', function([
         _tokensKept: tokensKept.toFixed(0) // remove decimal
       })
 
-      assertEvent(logs[1], 'TokenTransferred', {
+      assertEvent(logs[1], 'TokenBurned', {
         _bidId: '0',
         _token: daiToken.address,
-        _to: daiCharity.address,
         _total: scientificToDecimal(logs[0].args._tokensKept)
       })
 
@@ -1025,10 +915,6 @@ contract('LANDAuction', function([
       // Check DAI balance of LAND Auction contract
       balance = await daiToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
-
-      // Check balance of dai charity contract
-      balance = await daiToken.balanceOf(daiCharity.address)
-      balance.should.be.bignumber.equal(logs[0].args._tokensKept)
 
       // Check balance of bidder
       balance = await daiToken.balanceOf(bidder)
@@ -1065,6 +951,19 @@ contract('LANDAuction', function([
         gasPrice: gasPriceLimit
       })
 
+      assertEvent(logs[1], 'TokenTransferred', {
+        _bidId: '0',
+        _token: dclToken.address,
+        _to: tokenKiller.address,
+        _total: scientificToDecimal(logs[0].args._tokensKept.toString())
+      })
+
+      assertEvent(logs[2], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+      })
+
       // Check DCL balance of LAND Auction contract
       balance = await dclToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
@@ -1076,6 +975,126 @@ contract('LANDAuction', function([
       // Check DCL balance of Token Killer contract
       balance = await dclToken.balanceOf(tokenKiller.address)
       balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+    })
+
+    it('should increase bid id', async function() {
+      let res = await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '0',
+        _xs: xs,
+        _ys: ys
+      })
+
+      res = await landAuction.bid([10], [11], bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '1',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '1',
+        _xs: [10],
+        _ys: [11]
+      })
+
+      res = await landAuction.bid([12], [13], bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '2',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '2',
+        _xs: [12],
+        _ys: [13]
+      })
+    })
+
+    it('should keep balance of LANDAuction contract at 0', async function() {
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      await landAuction.bid([5], [5], anotherBidder, manaToken.address, {
+        ...fromAnotherBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      await landAuction.bid([6], [6], bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      const balance = await manaToken.balanceOf(landAuction.address)
+      balance.should.be.bignumber.equal(0)
+
+      let id = await landRegistry._encodeTokenId(5, 5)
+      let address = await landRegistry.ownerOf(id)
+      address.should.be.equal(anotherBidder)
+
+      id = await landRegistry._encodeTokenId(6, 6)
+      address = await landRegistry.ownerOf(id)
+      address.should.be.equal(bidder)
+
+      for (let i = 0; i < xs.length; i++) {
+        id = await landRegistry._encodeTokenId(xs[i], ys[i])
+        address = await landRegistry.ownerOf(id)
+        address.should.be.equal(bidder)
+      }
+    })
+
+    it('should assign LANDs to beneficiary', async function() {
+      await landAuction.bid(xs, ys, anotherBidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
+
+      for (let i = 0; i < xs.length; i++) {
+        const id = await landRegistry._encodeTokenId(xs[i], ys[i])
+        const address = await landRegistry.ownerOf(id)
+        address.should.be.equal(anotherBidder)
+      }
+    })
+
+    it('should bid limit LANDs', async function() {
+      await landAuction.bid(
+        [-150, 150],
+        [-150, 150],
+        bidder,
+        manaToken.address,
+        {
+          ...fromBidder,
+          gasPrice: gasPriceLimit
+        }
+      )
+    })
+
+    it('should bid with MANA token without dex', async function() {
+      await landAuction.setDex(0, fromOwner)
+      await landAuction.bid(xs, ys, bidder, manaToken.address, {
+        ...fromBidder,
+        gasPrice: gasPriceLimit
+      })
     })
 
     it('should bid with less gas Price', async function() {
@@ -1428,16 +1447,18 @@ contract('LANDAuction', function([
         erc20.address,
         MAX_DECIMALS,
         false,
-        false,
-        0,
+        true,
+        tokenKiller.address,
         fromOwner
       )
 
       assertEvent(logs[0], 'TokenAllowed', {
         _caller: owner,
         _address: erc20.address,
-        _decimals: MAX_DECIMALS.toString()
-        //_shouyld: false
+        _decimals: MAX_DECIMALS.toString(),
+        _shouldBurnTokens: false,
+        _shouldForwardTokens: true,
+        _forwardTarget: tokenKiller.address
       })
 
       isAllowed = (await landAuction.tokensAllowed(erc20.address))[4]
