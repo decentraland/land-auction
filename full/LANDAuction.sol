@@ -322,7 +322,7 @@ contract LANDAuctionStorage {
     uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
-    enum Status { created, started, finished }
+    enum Status { created, finished }
 
     struct Func {
         uint256 slope;
@@ -351,19 +351,15 @@ contract LANDAuctionStorage {
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startedTime;
+    uint256 internal startTime;
     uint256 internal duration;
 
     event AuctionCreated(
       address indexed _caller,
+      uint256 _startTime,
+      uint256 _duration,
       uint256 _initialPrice,
-      uint256 _endPrice,
-      uint256 _duration
-    );
-
-    event AuctionStarted(
-      address indexed _caller,
-      uint256 _time
+      uint256 _endPrice
     );
 
     event BidConvertion(
@@ -445,6 +441,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * the first value of _yPoints will be the initial price and the last value will be the endPrice
     * @param _xPoints - uint256[] of seconds
     * @param _yPoints - uint256[] of prices
+    * @param _startTime - uint256 timestamp in seconds when the auction will start
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
+    * @param _gasPriceLimit - uint256 gas price limit for a single bid
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
@@ -452,6 +451,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     constructor(
         uint256[] _xPoints, 
         uint256[] _yPoints, 
+        uint256 _startTime,
+        uint256 _landsLimitPerBid,
+        uint256 _gasPriceLimit,
         ERC20 _manaToken, 
         ERC20 _daiToken,
         LANDRegistry _landRegistry,
@@ -462,6 +464,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Initialize owneable
         Ownable.initialize(msg.sender);
 
+        // Schedule auction
+        require(_startTime > block.timestamp, "Started time should be after now");
+        startTime = _startTime;
+
         // Set LANDRegistry
         require(
             address(_landRegistry).isContract(),
@@ -469,19 +475,18 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
-        // Set Dai charity
         require(
             address(_daiCharity).isContract(),
             "The DAI Charity token address must be a deployed contract"
         );
         daiCharity = _daiCharity;
 
-        // Set token killer
         require(
             address(_tokenKiller).isContract(),
             "The Token Killer must be a deployed contract"
         );
         tokenKiller = _tokenKiller;
+
 
         setDex(_dex);
 
@@ -499,38 +504,21 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
+
+        // Set limits
+        setLandsLimitPerBid(_landsLimitPerBid);
+        setGasPriceLimit(_gasPriceLimit);
         
         // Initialize status
         status = Status.created;      
 
         emit AuctionCreated(
             msg.sender,
+            _startTime,
+            duration,
             initialPrice, 
-            endPrice,
-            duration
+            endPrice
         );
-    }
-
-    /**
-    * @dev Start the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
-    * @param _gasPriceLimit - uint256 gas price limit for a single bid
-    */
-    function startAuction(
-        uint256 _landsLimitPerBid,
-        uint256 _gasPriceLimit
-    ) 
-    external onlyOwner 
-    {
-        require(status == Status.created, "The auction was started");
-
-        setLandsLimitPerBid(_landsLimitPerBid);
-        setGasPriceLimit(_gasPriceLimit);
-
-        startedTime = block.timestamp;
-        status = Status.started;
-
-        emit AuctionStarted(msg.sender, startedTime);
     }
 
     /**
@@ -553,6 +541,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _beneficiary, 
             _fromToken
         );
+        
         uint256 bidId = _getBidId();
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
@@ -632,20 +621,23 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Current LAND price. 
-    * Note that if the auction was not started returns the started price and when
+    * Note that if the auction was not started returns the initial price and when
     * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
     function getCurrentPrice() public view returns (uint256) { 
-        if (startedTime == 0) {
+        // If the auction has not started returns initialPrice
+        if (startTime == 0 || startTime >= block.timestamp) {
             return initialPrice;
-        } else {
-            uint256 timePassed = block.timestamp - startedTime;
-            if (timePassed >= duration) {
-                return endPrice;
-            }
-            return _getPrice(timePassed);
         }
+
+        // If the auction has finished returns endPrice
+        uint256 timePassed = block.timestamp - startTime;
+        if (timePassed >= duration) {
+            return endPrice;
+        }
+
+        return _getPrice(timePassed);
     }
 
     /**
@@ -897,8 +889,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) internal view 
     {
-        require(status == Status.started, "The auction was not started");
-        require(block.timestamp - startedTime <= duration, "The auction has finished");
+        require(startTime <= block.timestamp, "The auction has not started");
+        require(
+            status == Status.created && 
+            block.timestamp.sub(startTime) <= duration, 
+            "The auction has finished"
+        );
         require(tx.gasprice <= gasPriceLimit, "Gas price limit exceeded");
         require(_beneficiary != address(0), "The beneficiary could not be 0 address");
         require(_xs.length > 0, "You should bid to at least one LAND");
@@ -920,74 +916,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Burn MANA token
         _burnToken(_bidId, manaToken);       
-    }
-
-    
-    /** 
-    * @dev Burn tokens. 
-    * Note that if the token is the DAI token we will transfer the funds 
-    * to the DAI charity contract.
-    * For the rest of the tokens if not implement the burn method 
-    * we will transfer the funds to a token killer address
-    * @param _bidId - uint256 of the bid Id
-    * @param _token - ERC20 token
-    */
-    function _burnToken(uint256 _bidId, ERC20 _token) private {
-        uint256 balance = _token.balanceOf(address(this));
-
-        if(_token == daiToken) {
-            // Transfer to DAI charity if token to burn is DAI
-            require(
-                _token.transfer(daiCharity, balance),
-                "Could not transfer tokens to DAI charity" 
-            );
-        } else {
-            // Burn funds
-            bool result = _safeBurn(_token, balance);
-
-            if (!result) {
-                // If token does not implement burn method suicide tokens
-                require(
-                    _token.transfer(tokenKiller, balance),
-                    "Could not transfer tokens to the token killer contract" 
-                );
-            }
-        }
-
-        emit TokenBurned(_bidId, address(_token), balance);
-
-        // Check if balance of the auction contract is empty
-        balance = _token.balanceOf(address(this));
-        require(balance == 0, "Burn token failed");
-    }
-
-    /** 
-    * @dev Execute burn method. 
-    * Note that if the contract does not implement it will return false
-    * @param _token - ERC20 token
-    * @param _amount - uint256 of the amount to burn
-    * @return bool if burn has been successfull
-    */
-    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
-        success = address(_token).call(abi.encodeWithSelector(
-            _token.burn.selector,
-            _amount
-        ));        
-    }
-
-    /** 
-    * @dev Return bid id
-    * @return uint256 of the bid id
-    */
-    function _getBidId() private view returns (uint256) {
-        return totalBids;
-    }
-
-    /** 
-    * @dev Increments bid id 
-    */
-    function _incrementBids() private {
-        totalBids = totalBids.add(1);
     }
 
     /** 
@@ -1043,7 +971,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Calculate base and slope for the given points
     * It is a linear function y = ax - b. But The slope should be negative.
-    * As Solidity does not support negative number we use it as: y = b - ax
+    * As we want to avoid negative numbers in favor of using uints we use it as: y = b - ax
     * Based on two points (x1; x2) and (y1; y2)
     * base = (x2 * y1) - (x1 * y2) / x2 - x1
     * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
@@ -1063,5 +991,75 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     {
         base = ((_x2.mul(_y1)).sub(_x1.mul(_y2))).div(_x2.sub(_x1));
         slope = (_y1.sub(_y2)).div(_x2.sub(_x1));
+    }
+
+    /** 
+    * @dev Burn tokens. 
+    * Note that if the token is the DAI token we will transfer the funds 
+    * to the DAI charity contract.
+    * For the rest of the tokens if not implement the burn method 
+    * we will transfer the funds to a token killer address
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnToken(uint256 _bidId, ERC20 _token) private {
+        uint256 balance = _token.balanceOf(address(this));
+
+        // Check if balance is valid
+        require(balance > 0, "Balance to burn should be > 0");
+
+        if (_token == daiToken) {
+            // Transfer to DAI charity if token to burn is DAI
+            require(
+                _token.transfer(daiCharity, balance),
+                "Could not transfer tokens to DAI charity" 
+            );
+        } else {
+            // Burn funds
+            bool result = _safeBurn(_token, balance);
+
+            if (!result) {
+                // If token does not implement burn method suicide tokens
+                require(
+                    _token.transfer(tokenKiller, balance),
+                    "Could not transfer tokens to the token killer contract" 
+                );
+            }
+        }
+
+        emit TokenBurned(_bidId, address(_token), balance);
+
+        // Check if balance of the auction contract is empty
+        balance = _token.balanceOf(address(this));
+        require(balance == 0, "Burn token failed");
+    }
+
+    /** 
+    * @dev Execute burn method. 
+    * Note that if the contract does not implement it will return false
+    * @param _token - ERC20 token
+    * @param _amount - uint256 of the amount to burn
+    * @return bool if burn has been successfull
+    */
+    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
+        success = address(_token).call(abi.encodeWithSelector(
+            _token.burn.selector,
+            _amount
+        ));        
+    }
+
+    /**
+    * @dev Return bid id
+    * @return uint256 of the bid id
+    */
+    function _getBidId() private view returns (uint256) {
+        return totalBids;
+    }
+
+    /** 
+    * @dev Increments bid id 
+    */
+    function _incrementBids() private {
+        totalBids = totalBids.add(1);
     }
 }

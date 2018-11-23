@@ -24,7 +24,7 @@ contract LANDAuctionStorage {
     uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
-    enum Status { created, started, finished }
+    enum Status { created, finished }
 
     struct Func {
         uint256 slope;
@@ -53,19 +53,15 @@ contract LANDAuctionStorage {
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startedTime;
+    uint256 internal startTime;
     uint256 internal duration;
 
     event AuctionCreated(
       address indexed _caller,
+      uint256 _startTime,
+      uint256 _duration,
       uint256 _initialPrice,
-      uint256 _endPrice,
-      uint256 _duration
-    );
-
-    event AuctionStarted(
-      address indexed _caller,
-      uint256 _time
+      uint256 _endPrice
     );
 
     event BidConvertion(

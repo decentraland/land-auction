@@ -7,6 +7,9 @@ contract LANDAuctionTest is LANDAuction {
     constructor(
         uint256[] _xPoints, 
         uint256[] _yPoints, 
+        uint256 _startTime,
+        uint256 _landsLimitPerBid,
+        uint256 _gasPriceLimit,
         ERC20 _manaToken, 
         ERC20 _daiToken,
         LANDRegistry _landRegistry,
@@ -16,6 +19,9 @@ contract LANDAuctionTest is LANDAuction {
     ) public LANDAuction(
         _xPoints, 
         _yPoints, 
+        _startTime,
+        _landsLimitPerBid,
+        _gasPriceLimit,
         _manaToken,
         _daiToken,
         _landRegistry, 
@@ -25,7 +31,7 @@ contract LANDAuctionTest is LANDAuction {
     ) {}
 
     function getPrice(uint256 _value) public view returns (uint256) {
-        if (startedTime == 0) {
+        if (startTime == 0) {
             return initialPrice;
         } else {
             if (_value >= duration) {
