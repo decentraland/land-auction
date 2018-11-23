@@ -95,7 +95,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         int[] _ys, 
         address _beneficiary, 
         ERC20 _fromToken
-    ) external 
+    )
+        external 
     {
         _validateBidParameters(
             _xs, 
@@ -502,12 +503,17 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             !(_shouldBurnTokens && _shouldForwardTokens),
             "The token should be either burned or transferred"
         );
+        require(
+            !_shouldForwardTokens || 
+            (_shouldForwardTokens && _forwardTarget.isContract()),
+            "The token should be transferred to a deployed contract"
+        );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
         tokensAllowed[_address] = Token({
             decimals: _decimals,
-            shouldForwardTokens: _shouldForwardTokens,
             shouldBurnTokens: _shouldBurnTokens,
+            shouldForwardTokens: _shouldForwardTokens,
             forwardTarget: _forwardTarget,
             isAllowed: true
         });
@@ -516,8 +522,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             msg.sender, 
             _address, 
             _decimals,
-            _shouldForwardTokens,
             _shouldBurnTokens,
+            _shouldForwardTokens,
             _forwardTarget
         );
     }
