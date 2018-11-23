@@ -43,7 +43,10 @@ contract LANDAuctionStorage {
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
+    ERC20 public daiToken;
     LANDRegistry public landRegistry;
+    address public daiCharity;
+    address public tokenKiller;
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
     Func[] internal curves;
@@ -90,7 +93,7 @@ contract LANDAuctionStorage {
     );
 
     event TokenBurned(
-      address indexed _caller,
+      uint256 _bidId,
       address indexed _token,
       uint256 _total
     );

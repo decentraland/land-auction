@@ -284,12 +284,41 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken);
 
     /**
+    * @dev Burn the MANA and other tokens earned
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnFunds(uint256 _bidId, ERC20 _token) internal;
+
+    /**
+    * @dev Burn tokens.
+    * Note that if the token is the DAI token we will transfer the funds
+    * to the DAI charity contract.
+    * For the rest of the tokens if not implement the burn method
+    * we will transfer the funds to a token killer address
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnToken(uint256 _bidId, ERC20 _token) private;
+
+    /**
     * @dev Execute burn method.
-    * Note that if the contract does not implement it will revert
+    * Note that if the contract does not implement it will return false
     * @param _token - ERC20 token
     * @param _amount - uint256 of the amount to burn
+    * @return bool if burn has been successfull
     */
-    function _safeBurn(ERC20 _token, uint256 _amount) internal;
+    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success);
 
+    /**
+    * @dev Return bid id
+    * @return uint256 of the bid id
+    */
+    function _getBidId() private view returns (uint256);
+
+    /**
+    * @dev Increments bid id
+    */
+    function _incrementBids() private;
 }
 ```

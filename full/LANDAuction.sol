@@ -341,7 +341,10 @@ contract LANDAuctionStorage {
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
+    ERC20 public daiToken;
     LANDRegistry public landRegistry;
+    address public daiCharity;
+    address public tokenKiller;
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
     Func[] internal curves;
@@ -388,7 +391,7 @@ contract LANDAuctionStorage {
     );
 
     event TokenBurned(
-      address indexed _caller,
+      uint256 _bidId,
       address indexed _token,
       uint256 _total
     );
@@ -450,8 +453,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256[] _xPoints, 
         uint256[] _yPoints, 
         ERC20 _manaToken, 
+        ERC20 _daiToken,
         LANDRegistry _landRegistry,
-        address _dex
+        address _dex,
+        address _daiCharity,
+        address _tokenKiller
     ) public {
         // Initialize owneable
         Ownable.initialize(msg.sender);
@@ -463,11 +469,29 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         landRegistry = _landRegistry;
 
+        // Set Dai charity
+        require(
+            address(_daiCharity).isContract(),
+            "The DAI Charity token address must be a deployed contract"
+        );
+        daiCharity = _daiCharity;
+
+        // Set token killer
+        require(
+            address(_tokenKiller).isContract(),
+            "The Token Killer must be a deployed contract"
+        );
+        tokenKiller = _tokenKiller;
+
         setDex(_dex);
 
         // Set MANAToken
         allowToken(address(_manaToken), 18, true);
         manaToken = _manaToken;
+
+        // Allow DAI and keep tokens
+        allowToken(address(_daiToken), 18, true);
+        daiToken = _daiToken;
 
         // Set total duration of the auction
         duration = _xPoints[_xPoints.length - 1];
@@ -510,31 +534,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Burn the MANA earned by the auction
-    */
-    function burnFunds(ERC20 _token) external {
-        require(
-            status == Status.finished,
-            "Burn should be performed when the auction is finished"
-        );
-        require(
-            address(_token).isContract(),
-            "_from token should be a contract"
-        );
-
-        uint256 balance = _token.balanceOf(address(this));
-
-        require(
-            balance > 0,
-            "No tokens left to burn"
-        );
-
-        // Burn tokens
-        _safeBurn(_token, balance);
-        emit TokenBurned(msg.sender, address(_token), balance);
-    }
-
-    /**
     * @dev Make a bid for LANDs
     * @param _xs - uint256[] x values for the LANDs to bid
     * @param _ys - uint256[] y values for the LANDs to bid
@@ -554,7 +553,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _beneficiary, 
             _fromToken
         );
-
+        uint256 bidId = _getBidId();
         uint256 currentPrice = getCurrentPrice();
         uint256 totalPrice = _xs.length.mul(currentPrice);
         
@@ -564,7 +563,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Pay with other token than MANA is not available"
             );
             // Convert _fromToken to MANA
-            totalPrice = _convertSafe(totalBids, _fromToken, totalPrice);
+            totalPrice = _convertSafe(bidId, _fromToken, totalPrice);
         } else {
             // Transfer MANA to LANDAuction contract
             require(
@@ -572,6 +571,9 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
                 "Transfering the totalPrice to LANDAuction contract failed"
             );
         }
+
+        // Burn Transferred funds
+        _burnFunds(bidId, _fromToken);
 
         // Assign LANDs to _beneficiary
         for (uint i = 0; i < _xs.length; i++) {
@@ -583,7 +585,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
 
         emit BidSuccessful(
-            totalBids,
+            bidId,
             _beneficiary,
             _fromToken,
             currentPrice,
@@ -592,8 +594,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _ys
         );  
 
-        // Increase bids count
-        totalBids++;
+        // Increment bids count
+        _incrementBids();
     }
 
     /**
@@ -905,20 +907,87 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
     }
 
+    /**
+    * @dev Burn the MANA and other tokens earned
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnFunds(uint256 _bidId, ERC20 _token) internal {
+        if (_token != manaToken && tokensAllowed[address(_token)].shouldKeepToken) {
+            // Burn no MANA token
+            _burnToken(_bidId, _token);
+        }
+
+        // Burn MANA token
+        _burnToken(_bidId, manaToken);       
+    }
+
+    
+    /** 
+    * @dev Burn tokens. 
+    * Note that if the token is the DAI token we will transfer the funds 
+    * to the DAI charity contract.
+    * For the rest of the tokens if not implement the burn method 
+    * we will transfer the funds to a token killer address
+    * @param _bidId - uint256 of the bid Id
+    * @param _token - ERC20 token
+    */
+    function _burnToken(uint256 _bidId, ERC20 _token) private {
+        uint256 balance = _token.balanceOf(address(this));
+
+        if(_token == daiToken) {
+            // Transfer to DAI charity if token to burn is DAI
+            require(
+                _token.transfer(daiCharity, balance),
+                "Could not transfer tokens to DAI charity" 
+            );
+        } else {
+            // Burn funds
+            bool result = _safeBurn(_token, balance);
+
+            if (!result) {
+                // If token does not implement burn method suicide tokens
+                require(
+                    _token.transfer(tokenKiller, balance),
+                    "Could not transfer tokens to the token killer contract" 
+                );
+            }
+        }
+
+        emit TokenBurned(_bidId, address(_token), balance);
+
+        // Check if balance of the auction contract is empty
+        balance = _token.balanceOf(address(this));
+        require(balance == 0, "Burn token failed");
+    }
+
     /** 
     * @dev Execute burn method. 
-    * Note that if the contract does not implement it will revert
+    * Note that if the contract does not implement it will return false
     * @param _token - ERC20 token
     * @param _amount - uint256 of the amount to burn
+    * @return bool if burn has been successfull
     */
-    function _safeBurn(ERC20 _token, uint256 _amount) internal {
-        require(
-            address(_token).call(abi.encodeWithSelector(
-                _token.burn.selector,
-                _amount
-            )), 
-            "Burn can not be performed for this token"
-        );        
+    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success) {
+        success = address(_token).call(abi.encodeWithSelector(
+            _token.burn.selector,
+            _amount
+        ));        
+    }
+
+    /** 
+    * @dev Return bid id
+    * @return uint256 of the bid id
+    */
+    function _getBidId() private view returns (uint256) {
+        return totalBids;
+    }
+
+    /** 
+    * @dev Increments bid id 
+    */
+    function _incrementBids() private {
+        totalBids = totalBids.add(1);
     }
 
     /** 
