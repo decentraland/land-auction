@@ -45,7 +45,7 @@ contract LANDAuctionStorage {
       uint256 _time
     );
 
-    event BidConvertion(
+    event BidConversion(
       uint256 _bidId,
       address indexed _token,
       uint256 _totalPriceInMana,
@@ -243,7 +243,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
-    * the convertion fee.
+    * the conversion fee.
     * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA

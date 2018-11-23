@@ -37,7 +37,7 @@ contract LANDAuctionStorage {
         bool isAllowed;
     }
 
-    uint256 public convertionFee = 105;
+    uint256 public conversionFee = 105;
     uint256 public totalBids = 0;
     Status public status;
     uint256 public gasPriceLimit;
@@ -64,7 +64,7 @@ contract LANDAuctionStorage {
       uint256 _endPrice
     );
 
-    event BidConvertion(
+    event BidConversion(
       uint256 _bidId,
       address indexed _token,
       uint256 _totalPriceInMana,
@@ -124,9 +124,9 @@ contract LANDAuctionStorage {
       address indexed _address
     );
 
-    event ConvertionFeeChanged(
+    event ConversionFeeChanged(
       address indexed _caller,
-      uint256 _oldConvertionFee,
-      uint256 _convertionFee
+      uint256 _oldConversionFee,
+      uint256 _conversionFee
     );
 }

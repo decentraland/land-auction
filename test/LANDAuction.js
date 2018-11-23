@@ -364,6 +364,7 @@ contract('LANDAuction', function([
 
       logs = await getEvents(_landAuction, 'TokenAllowed')
       logs.length.should.be.equal(2)
+
       assertEvent(logs[0], 'TokenAllowed', {
         _caller: owner,
         _address: manaToken.address
@@ -888,33 +889,23 @@ contract('LANDAuction', function([
 
       logs.length.should.be.equal(2)
 
-      assertEvent(
-        logs[0],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: manaToken.address,
-          _total: scientificToDecimal(logs[1].args._totalPrice)
-        },
-        true
-      )
+      assertEvent(logs[0], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[1].args._totalPrice)
+      })
 
-      assertEvent(
-        normalizeEvent(logs[1]),
-        'BidSuccessful',
-        {
-          _bidId: '0',
-          _beneficiary: bidder,
-          _token: manaToken.address,
-          _price: price.toString(),
-          _totalPrice: weiToDecimal(
-            getPriceWithLinearFunction(time, false) * xs.length
-          ).toString(),
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[1]), 'BidSuccessful', {
+        _bidId: '0',
+        _beneficiary: bidder,
+        _token: manaToken.address,
+        _price: price.toString(),
+        _totalPrice: weiToDecimal(
+          getPriceWithLinearFunction(time, false) * xs.length
+        ).toString(),
+        _xs: xs,
+        _ys: ys
+      })
 
       for (let i = 0; i < xs.length; i++) {
         const id = await landRegistry._encodeTokenId(xs[i], ys[i])
@@ -931,76 +922,51 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      assertEvent(
-        res.logs[0],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: manaToken.address,
-          _total: scientificToDecimal(res.logs[1].args._totalPrice)
-        },
-        true
-      )
-      assertEvent(
-        normalizeEvent(res.logs[1]),
-        'BidSuccessful',
-        {
-          _bidId: '0',
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '0',
+        _xs: xs,
+        _ys: ys
+      })
 
       res = await landAuction.bid([10], [11], bidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      assertEvent(
-        res.logs[0],
-        'TokenBurned',
-        {
-          _bidId: '1',
-          _token: manaToken.address,
-          _total: scientificToDecimal(res.logs[1].args._totalPrice)
-        },
-        true
-      )
-      assertEvent(
-        normalizeEvent(res.logs[1]),
-        'BidSuccessful',
-        {
-          _bidId: '1',
-          _xs: [10],
-          _ys: [11]
-        },
-        true
-      )
+
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '1',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '1',
+        _xs: [10],
+        _ys: [11]
+      })
 
       res = await landAuction.bid([12], [13], bidder, manaToken.address, {
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      assertEvent(
-        res.logs[0],
-        'TokenBurned',
-        {
-          _bidId: '2',
-          _token: manaToken.address,
-          _total: scientificToDecimal(res.logs[1].args._totalPrice)
-        },
-        true
-      )
-      assertEvent(
-        normalizeEvent(res.logs[1]),
-        'BidSuccessful',
-        {
-          _bidId: '2',
-          _xs: [12],
-          _ys: [13]
-        },
-        true
-      )
+
+      assertEvent(res.logs[0], 'TokenBurned', {
+        _bidId: '2',
+        _token: manaToken.address,
+        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+      })
+
+      assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
+        _bidId: '2',
+        _xs: [12],
+        _ys: [13]
+      })
     })
 
     it('should keep balance of LANDAuction contract at 0', async function() {
@@ -1103,48 +1069,33 @@ contract('LANDAuction', function([
 
       logs.length.should.be.equal(3)
 
-      assertEvent(
-        normalizeEvent(logs[0]),
-        'BidConvertion',
-        {
-          _bidId: '0',
-          _token: daiToken.address,
-          _totalPriceInMana: weiToDecimal(
-            getPriceWithLinearFunction(time, false) * xs.length
-          ).toString(),
-          _totalPriceInToken: scientificToDecimal(totalPriceInToken),
-          _tokensKept: '0'
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
+        _bidId: '0',
+        _token: daiToken.address,
+        _totalPriceInMana: weiToDecimal(
+          getPriceWithLinearFunction(time, false) * xs.length
+        ).toString(),
+        _totalPriceInToken: scientificToDecimal(totalPriceInToken),
+        _tokensKept: '0'
+      })
 
-      assertEvent(
-        logs[1],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: manaToken.address,
-          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
-        },
-        true
-      )
+      assertEvent(logs[1], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+      })
 
-      assertEvent(
-        normalizeEvent(logs[2]),
-        'BidSuccessful',
-        {
-          _bidId: '0',
-          _beneficiary: bidderWithOnlyDAI,
-          _token: daiToken.address,
-          _price: price.toString(),
-          _totalPrice: weiToDecimal(
-            getPriceWithLinearFunction(time, false) * xs.length
-          ).toString(),
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[2]), 'BidSuccessful', {
+        _bidId: '0',
+        _beneficiary: bidderWithOnlyDAI,
+        _token: daiToken.address,
+        _price: price.toString(),
+        _totalPrice: weiToDecimal(
+          getPriceWithLinearFunction(time, false) * xs.length
+        ).toString(),
+        _xs: xs,
+        _ys: ys
+      })
 
       // Check LANDs were assigned
       for (let i = 0; i < xs.length; i++) {
@@ -1211,48 +1162,33 @@ contract('LANDAuction', function([
         logs[0].args._totalPriceInMana
       )
 
-      assertEvent(
-        normalizeEvent(logs[0]),
-        'BidConvertion',
-        {
-          _bidId: '0',
-          _token: dclToken.address,
-          _totalPriceInMana: weiToDecimal(
-            getPriceWithLinearFunction(time, false) * xs.length
-          ).toString(),
-          _totalPriceInToken: totalPriceInToken.toString(),
-          _tokensKept: '0'
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
+        _bidId: '0',
+        _token: dclToken.address,
+        _totalPriceInMana: weiToDecimal(
+          getPriceWithLinearFunction(time, false) * xs.length
+        ).toString(),
+        _totalPriceInToken: totalPriceInToken.toString(),
+        _tokensKept: '0'
+      })
 
-      assertEvent(
-        logs[1],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: manaToken.address,
-          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
-        },
-        true
-      )
+      assertEvent(logs[1], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+      })
 
-      assertEvent(
-        normalizeEvent(logs[2]),
-        'BidSuccessful',
-        {
-          _bidId: '0',
-          _beneficiary: bidder,
-          _token: dclToken.address,
-          _price: price.toString(),
-          _totalPrice: weiToDecimal(
-            getPriceWithLinearFunction(time, false) * xs.length
-          ).toString(),
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[2]), 'BidSuccessful', {
+        _bidId: '0',
+        _beneficiary: bidder,
+        _token: dclToken.address,
+        _price: price.toString(),
+        _totalPrice: weiToDecimal(
+          getPriceWithLinearFunction(time, false) * xs.length
+        ).toString(),
+        _xs: xs,
+        _ys: ys
+      })
 
       // Check balance of LAND Auction contract
       const balance = await manaToken.balanceOf(landAuction.address)
@@ -1306,55 +1242,35 @@ contract('LANDAuction', function([
       // Keep 5% percentage of the token
       const tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
 
-      assertEvent(
-        normalizeEvent(logs[0]),
-        'BidConvertion',
-        {
-          _bidId: '0',
-          _token: daiToken.address,
-          _totalPriceInMana: totalPrice.toString(),
-          _totalPriceInToken: scientificToDecimal(totalPriceInToken),
-          _tokensKept: tokensKept.toFixed(0) // remove decimal
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
+        _bidId: '0',
+        _token: daiToken.address,
+        _totalPriceInMana: totalPrice.toString(),
+        _totalPriceInToken: scientificToDecimal(totalPriceInToken),
+        _tokensKept: tokensKept.toFixed(0) // remove decimal
+      })
 
-      assertEvent(
-        logs[1],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: daiToken.address,
-          _total: scientificToDecimal(logs[0].args._tokensKept)
-        },
-        true
-      )
+      assertEvent(logs[1], 'TokenBurned', {
+        _bidId: '0',
+        _token: daiToken.address,
+        _total: scientificToDecimal(logs[0].args._tokensKept)
+      })
 
-      assertEvent(
-        logs[2],
-        'TokenBurned',
-        {
-          _bidId: '0',
-          _token: manaToken.address,
-          _total: scientificToDecimal(logs[0].args._totalPriceInMana)
-        },
-        true
-      )
+      assertEvent(logs[2], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+      })
 
-      assertEvent(
-        normalizeEvent(logs[3]),
-        'BidSuccessful',
-        {
-          _bidId: '0',
-          _beneficiary: bidder,
-          _token: daiToken.address,
-          _price: price.toString(),
-          _totalPrice: totalPrice.toString(),
-          _xs: xs,
-          _ys: ys
-        },
-        true
-      )
+      assertEvent(normalizeEvent(logs[3]), 'BidSuccessful', {
+        _bidId: '0',
+        _beneficiary: bidder,
+        _token: daiToken.address,
+        _price: price.toString(),
+        _totalPrice: totalPrice.toString(),
+        _xs: xs,
+        _ys: ys
+      })
 
       // Check MANA balance of LAND Auction contract
       balance = await manaToken.balanceOf(landAuction.address)
@@ -1819,42 +1735,38 @@ contract('LANDAuction', function([
     })
   })
 
-  describe('setConvertionFee', function() {
-    it('should change convertion fee', async function() {
-      let convertionFee = await landAuction.convertionFee()
-      convertionFee.should.be.bignumber.equal(CONVERTION_FEE)
+  describe('setConversionFee', function() {
+    it('should change conversion fee', async function() {
+      let conversionFee = await landAuction.conversionFee()
+      conversionFee.should.be.bignumber.equal(CONVERTION_FEE)
 
-      const { logs } = await landAuction.setConvertionFee(110, fromOwner)
-      assertEvent(
-        normalizeEvent(logs[0]),
-        'ConvertionFeeChanged',
-        {
-          _caller: owner,
-          _oldConvertionFee: CONVERTION_FEE.toString(),
-          _convertionFee: '110'
-        },
-        true
-      )
+      const { logs } = await landAuction.setConversionFee(110, fromOwner)
 
-      convertionFee = await landAuction.convertionFee()
-      convertionFee.should.be.bignumber.equal(110)
+      assertEvent(normalizeEvent(logs[0]), 'ConversionFeeChanged', {
+        _caller: owner,
+        _oldConversionFee: CONVERTION_FEE.toString(),
+        _conversionFee: '110'
+      })
 
-      await landAuction.setConvertionFee(100, fromOwner)
+      conversionFee = await landAuction.conversionFee()
+      conversionFee.should.be.bignumber.equal(110)
 
-      convertionFee = await landAuction.convertionFee()
-      convertionFee.should.be.bignumber.equal(100)
+      await landAuction.setConversionFee(100, fromOwner)
+
+      conversionFee = await landAuction.conversionFee()
+      conversionFee.should.be.bignumber.equal(100)
     })
 
     it('reverts when changing to less than 100', async function() {
-      await assertRevert(landAuction.setConvertionFee(99, fromOwner))
+      await assertRevert(landAuction.setConversionFee(99, fromOwner))
     })
 
     it('reverts when changing to > 199', async function() {
-      await assertRevert(landAuction.setConvertionFee(200, fromOwner))
+      await assertRevert(landAuction.setConversionFee(200, fromOwner))
     })
 
     it('reverts when no-owner trying to change it', async function() {
-      await assertRevert(landAuction.setConvertionFee(110, fromHacker))
+      await assertRevert(landAuction.setConversionFee(110, fromHacker))
     })
   })
 })

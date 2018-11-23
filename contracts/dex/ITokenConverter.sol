@@ -12,7 +12,7 @@ contract ITokenConverter {
     * @param _srcToken - IERC20 token
     * @param _destToken - IERC20 token 
     * @param _srcAmount - uint256 amount to be converted
-    * @param _destAmount - uint256 amount to get after convertion
+    * @param _destAmount - uint256 amount to get after conversion
     * @return uint256 for the change. 0 if there is no change
     */
     function convert(
