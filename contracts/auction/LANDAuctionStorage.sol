@@ -31,9 +31,12 @@ contract LANDAuctionStorage {
         uint256 base;
         uint256 limit;
     }
+
     struct Token {
         uint256 decimals;
-        bool shouldKeepToken;
+        bool shouldBurnTokens;
+        bool shouldForwardTokens;
+        address forwardTarget;
         bool isAllowed;
     }
 
@@ -43,10 +46,8 @@ contract LANDAuctionStorage {
     uint256 public gasPriceLimit;
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
-    ERC20 public daiToken;
     LANDRegistry public landRegistry;
-    address public daiCharity;
-    address public tokenKiller;
+    
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
     Func[] internal curves;
@@ -94,6 +95,13 @@ contract LANDAuctionStorage {
       uint256 _total
     );
 
+    event TokenTransferred(
+      uint256 _bidId,
+      address indexed _token,
+      address indexed _to,
+      uint256 _total
+    );
+
     event LandsLimitPerBidChanged(
       address indexed _caller,
       uint256 _oldLandsLimitPerBid, 
@@ -116,7 +124,9 @@ contract LANDAuctionStorage {
       address indexed _caller,
       address indexed _address,
       uint256 _decimals,
-      bool _shouldKeepToken
+      bool _shouldForwardTokens,
+      bool _shouldBurnTokens,
+      address indexed _forwardTarget
     );
 
     event TokenDisabled(

@@ -11,38 +11,45 @@ contract LANDAuctionStorage {
     uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
-    enum Status { created, started, finished }
+    enum Status { created, finished }
 
-    struct tokenAllowed {
+    struct Func {
+        uint256 slope;
+        uint256 base;
+        uint256 limit;
+    }
+
+    struct Token {
         uint256 decimals;
-        bool shouldKeepToken;
+        bool shouldBurnTokens;
+        bool shouldForwardTokens;
+        address forwardTarget;
         bool isAllowed;
     }
 
+    uint256 public conversionFee = 105;
+    uint256 public totalBids = 0;
     Status public status;
+    uint256 public gasPriceLimit;
+    uint256 public landsLimitPerBid;
+    ERC20 public manaToken;
+    LANDRegistry public landRegistry;
+
+    ITokenConverter public dex;
+    mapping (address => Token) public tokensAllowed;
+    Func[] internal curves;
 
     uint256 internal initialPrice;
     uint256 internal endPrice;
     uint256 internal startTime;
     uint256 internal duration;
 
-    uint256 public gasPriceLimit;
-    uint256 public landsLimitPerBid;
-    MANAToken public manaToken;
-    LANDRegistry public landRegistry;
-    ITokenConverter public dex;
-    mapping (address => TokenAllowed) public tokensAllowed;
-
     event AuctionCreated(
       address indexed _caller,
+      uint256 _startTime,
+      uint256 _duration,
       uint256 _initialPrice,
-      uint256 _endPrice,
-      uint256 _duration
-    );
-
-    event AuctionStarted(
-      address indexed _caller,
-      uint256 _time
+      uint256 _endPrice
     );
 
     event BidConversion(
@@ -50,7 +57,6 @@ contract LANDAuctionStorage {
       address indexed _token,
       uint256 _totalPriceInMana,
       uint256 _totalPriceInToken,
-      uint256 _change,
       uint256 _tokensKept
     );
 
@@ -71,8 +77,15 @@ contract LANDAuctionStorage {
     );
 
     event TokenBurned(
-      address indexed _caller,
-      address _token,
+      uint256 _bidId,
+      address indexed _token,
+      uint256 _total
+    );
+
+    event TokenTransferred(
+      uint256 _bidId,
+      address indexed _token,
+      address indexed _to,
       uint256 _total
     );
 
@@ -98,12 +111,20 @@ contract LANDAuctionStorage {
       address indexed _caller,
       address indexed _address,
       uint256 _decimals,
-      bool _shouldKeepToken
+      bool _shouldForwardTokens,
+      bool _shouldBurnTokens,
+      address indexed _forwardTarget
     );
 
     event TokenDisabled(
       address indexed _caller,
       address indexed _address
+    );
+
+    event ConversionFeeChanged(
+      address indexed _caller,
+      uint256 _oldConversionFee,
+      uint256 _conversionFee
     );
 }
 ```
@@ -112,48 +133,29 @@ contract LANDAuctionStorage {
 
 ```solidity
 contract LANDAuction is Ownable, LANDAuctionStorage {
-
     /**
-    * @dev Constructor of the contract
-    * @param _initialPrice - uint256 initial LAND price
-    * @param _endPrice - uint256 end LAND price
-    * @param _duration - uint256 duration of the auction in seconds
+    * @dev Constructor of the contract.
+    * Note that the last value of _xPoints will be the total duration and
+    * the first value of _yPoints will be the initial price and the last value will be the endPrice
+    * @param _xPoints - uint256[] of seconds
+    * @param _yPoints - uint256[] of prices
+    * @param _startTime - uint256 timestamp in seconds when the auction will start
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
+    * @param _gasPriceLimit - uint256 gas price limit for a single bid
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
     * @param _dex - address of the Dex to convert ERC20 tokens allowed to MANA
     */
     constructor(
-        uint256 _initialPrice,
-        uint256 _endPrice,
-        uint256 _duration,
+        uint256[] _xPoints,
+        uint256[] _yPoints,
+        uint256 _startTime,
+        uint256 _landsLimitPerBid,
+        uint256 _gasPriceLimit,
         ERC20 _manaToken,
         LANDRegistry _landRegistry,
         address _dex
     ) public;
-
-    /**
-    * @dev Start the auction
-    * @param _landsLimit - uint256 LANDs limit for a single bid
-    * @param _gasPriceLimit - uint256 gas price limit for a single bid
-    */
-    function startAuction(uint256 _landsLimit, uint256 _gasPriceLimit) external onlyOwner;
-
-    /**
-    * @dev Calculate LAND price based on time
-    * It is a linear function y = ax - b. But The slope should be negative.
-    * Based on two points (initialPrice; startTime = 0) and (endPrice; endTime = duration)
-    * slope = (endPrice - startedPrice) / (duration - startTime)
-    * As Solidity does not support negative number we use it as: y = b - ax
-    * @param _time - uint256 time passed before reach duration
-    * @return uint256 price for the given time
-    */
-    function _getPrice(uint256 _time) internal view returns (uint256);
-
-    /**
-    * @dev Current LAND price. If the auction was not started returns the started price
-    * @return uint256 current LAND price
-    */
-    function getCurrentPrice() public view returns (uint256);
 
     /**
     * @dev Make a bid for LANDs
@@ -163,93 +165,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _fromToken - token used to bid
     */
     function bid(
-        uint256[] _xs,
-        uint256[] _ys,
+        int[] _xs,
+        int[] _ys,
         address _beneficiary,
         ERC20 _fromToken
     ) external;
-
-    /**
-    * @dev Burn the MANA earned by the auction
-    */
-    function burnFunds() external;
-
-    /**
-    * @dev Finish auction
-    */
-    function finishAuction() public onlyOwner;
-
-    /**
-    * @dev Set LANDs limit for the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
-    */
-    function setLandsLimitPerBid(uint256 _landsLimit) public onlyOwner;
-
-    /**
-    * @dev Set gas price limit for the auction
-    * @param _gasPriceLimit - uint256 gas price limit for a single bid
-    */
-    function setGasPriceLimit(uint256 _gasPriceLimit) public onlyOwner;
-
-    /**
-    * @dev Allow many ERC20 tokens to to be used for bidding
-    * @param _address - array of addresses of the ERC20 Token
-    * @param _decimals - array of uint256 of the number of decimals
-    * @param _shouldKeepToken - array of boolean whether we should keep the token or not
-    */
-    function allowManyTokens(
-        address[] _address,
-        uint256[] _decimals,
-        bool[] _shouldKeepToken
-    ) external onlyOwner;
-
-    /**
-    * @dev Set dex to convert ERC20
-    * @param _dex - address of the token converter
-    */
-    function setDex(address _dex) public onlyOwner;
-
-    /**
-    * @dev Allow ERC20 to to be used for bidding
-    * @param _address - address of the ERC20 Token
-    * @param _decimals - uint256 of the number of decimals
-    * @param _shouldKeepToken - boolean whether we should keep the token or not
-    */
-    function allowToken(
-        address _address,
-        uint256 _decimals,
-        bool _shouldKeepToken)
-    public onlyOwner;
-
-    /**
-    * @dev Disable ERC20 to to be used for bidding
-    * @param _address - address of the ERC20 Token
-    */
-    function disableToken(address _address) public onlyOwner;
-
-    /**
-    * @dev Get exchange rate
-    * @param _srcToken - IERC20 token
-    * @param _destToken - IERC20 token
-    * @param _srcAmount - uint256 amount to be converted
-    * @return uint256 of the rate
-    */
-    function getRate(
-        IERC20 _srcToken,
-        IERC20 _destToken,
-        uint256 _srcAmount
-    ) public returns (uint256 rate)
-
-    /**
-    * @dev Convert allowed token to MANA and transfer the change in the original token
-    * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
-    * the conversion fee.
-    * @param _bidId - uint256 of the bid Id
-    * @param _fromToken - ERC20 token to be converted
-    * @param _totalPrice - uint256 of the total amount in MANA
-    * @return uint256 of the total amount of MANA
-    */
-    function _convertSafe(ERC20 _fromToken, uint256 _totalPrice) internal returns (bool);
 
     /**
     * @dev Validate bid function params
@@ -265,56 +185,193 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         ERC20 _fromToken
     ) internal view;
 
-    function _calculateTokensToKeep(uint256 _totalPrice, uint256 _tokenRate)
-    internal pure returns (uint256 tokensToKeep, uint256 totalPrice);
+    /**
+    * @dev Current LAND price.
+    * Note that if the auction was not started returns the initial price and when
+    * the auction is finished return the endPrice
+    * @return uint256 current LAND price
+    */
+    function getCurrentPrice() public view returns (uint256);
 
     /**
-    * @dev Normalize to _fromToken decimals
-    * @param _decimals - uint256 of _fromToken decimals
-    * @param _tokensToKeep - uint256 of the amount of tokens to keep
-    * @param _totalPriceInToken - uint256 of the amount of _fromToken
-    * @return tokensToKeep - uint256 of the amount of tokens to keep in _fromToken decimals
-    * @return totalPriceInToken - address beneficiary for the LANDs to bid in _fromToken decimals
+    * @dev Convert allowed token to MANA and transfer the change in the original token
+    * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
+    * the conversion fee.
+    * @param _bidId - uint256 of the bid Id
+    * @param _fromToken - ERC20 token to be converted
+    * @param _bidPriceInMana - uint256 of the total amount in MANA
+    * @return uint256 of the total amount of MANA to burn
     */
-    function _normalizeDecimals(
-        uint256 _decimals,
-        uint256 _tokensToKeep,
-        uint256 _totalPriceInToken
+    function _convertSafe(
+        uint256 _bidId,
+        ERC20 _fromToken,
+        uint256 _bidPriceInMana
+    ) internal returns (uint256 requiredManaAmountToBurn);
+
+    /**
+    * @dev Get exchange rate
+    * @param _srcToken - IERC20 token
+    * @param _destToken - IERC20 token
+    * @param _srcAmount - uint256 amount to be converted
+    * @return uint256 of the rate
+    */
+    function getRate(
+        IERC20 _srcToken,
+        IERC20 _destToken,
+        uint256 _srcAmount
+    ) public view returns (uint256 rate);
+
+    /**
+    * @dev Calculate the amount of tokens to process
+    * @param _totalPrice - uint256 price to calculate percentage to process
+    * @param _tokenRate - rate to calculate the amount of tokens
+    * @return uint256 of the amount of tokens required
+    */
+    function _calculateRequiredTokenBalance(
+        uint256 _totalPrice,
+        uint256 _tokenRate
     )
-    internal pure returns (uint256 tokensToKeep, uint256 totalPriceInToken);
+    internal pure returns (uint256);
 
     /**
-    * @dev Burn the MANA and other tokens earned
+    * @dev Calculate the total price in MANA
+    * Note that PERCENTAGE_OF_TOKEN_TO_KEEP will be always less than 100
+    * @param _totalPrice - uint256 price to calculate percentage to keep
+    * @return uint256 of the new total price in MANA
+    */
+    function _calculateRequiredManaAmount(
+        uint256 _totalPrice
+    )
+    internal pure returns (uint256);
+
+    /**
+    * @dev Burn or forward the MANA and other tokens earned
     * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
-    function _burnFunds(uint256 _bidId, ERC20 _token) internal;
+    function _processFunds(uint256 _bidId, ERC20 _token) internal;
 
     /**
-    * @dev Burn tokens.
-    * Note that if the token is the DAI token we will transfer the funds
-    * to the DAI charity contract.
-    * For the rest of the tokens if not implement the burn method
-    * we will transfer the funds to a token killer address
+    * @dev LAND price based on time
+    * Note that will select the function to calculate based on the time
+    * It should return endPrice if _time < duration
+    * @param _time - uint256 time passed before reach duration
+    * @return uint256 price for the given time
+    */
+    function _getPrice(uint256 _time) internal view returns (uint256);
+
+    /**
+    * @dev Burn tokens
     * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
-    function _burnToken(uint256 _bidId, ERC20 _token) private;
+    function _burnTokens(uint256 _bidId, ERC20 _token) private;
 
     /**
-    * @dev Execute burn method.
-    * Note that if the contract does not implement it will return false
+    * @dev Forward tokens
+    * @param _bidId - uint256 of the bid Id
+    * @param _address - address to send the tokens to
     * @param _token - ERC20 token
-    * @param _amount - uint256 of the amount to burn
-    * @return bool if burn has been successfull
     */
-    function _safeBurn(ERC20 _token, uint256 _amount) private returns (bool success);
+    function _forwardTokens(uint256 _bidId, address _address, ERC20 _token) private;
+
+    /**
+    * @dev Set conversion fee rate
+    * @param _fee - uint256 for the new conversion rate
+    */
+    function setConversionFee(uint256 _fee) external onlyOwner;
+
+    /**
+    * @dev Finish auction
+    */
+    function finishAuction() public onlyOwner;
+
+    /**
+    * @dev Set LANDs limit for the auction
+    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
+    */
+    function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner;
+
+    /**
+    * @dev Set gas price limit for the auction
+    * @param _gasPriceLimit - uint256 gas price limit for a single bid
+    */
+    function setGasPriceLimit(uint256 _gasPriceLimit) public onlyOwner;
+
+    /**
+    * @dev Set dex to convert ERC20
+    * @param _dex - address of the token converter
+    */
+    function setDex(address _dex) public onlyOwner;
+
+     /**
+    * @dev Allow ERC20 to to be used for bidding
+    * @param _address - address of the ERC20 Token
+    * @param _decimals - uint256 of the number of decimals
+    * @param _shouldBurnTokens - boolean whether we should burn funds
+    * @param _shouldForwardTokens - boolean whether we should transferred funds
+    * @param _forwardTarget - address where the funds will be transferred
+    */
+    function allowToken(
+        address _address,
+        uint256 _decimals,
+        bool _shouldBurnTokens,
+        bool _shouldForwardTokens,
+        address _forwardTarget
+    )
+    public onlyOwner;
+
+    /**
+    * @dev Disable ERC20 to to be used for bidding
+    * @param _address - address of the ERC20 Token
+    */
+    function disableToken(address _address) public onlyOwner;
+
+     /**
+    * @dev Create a combined function.
+    * note that we will set N - 1 function combinations based on N points (x,y)
+    * @param _xPoints - uint256[] of x values
+    * @param _yPoints - uint256[] of y values
+    */
+    function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal;
+
+    /**
+    * @dev Calculate base and slope for the given points
+    * It is a linear function y = ax - b. But The slope should be negative.
+    * As we want to avoid negative numbers in favor of using uints we use it as: y = b - ax
+    * Based on two points (x1; x2) and (y1; y2)
+    * base = (x2 * y1) - (x1 * y2) / x2 - x1
+    * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
+    * @param _x1 - uint256 x1 value
+    * @param _x2 - uint256 x2 value
+    * @param _y1 - uint256 y1 value
+    * @param _y2 - uint256 y2 value
+    * @return uint256 for the base
+    * @return uint256 for the slope
+    */
+    function _getFunc(
+        uint256 _x1,
+        uint256 _x2,
+        uint256 _y1,
+        uint256 _y2
+    ) internal pure returns (uint256 base, uint256 slope);
 
     /**
     * @dev Return bid id
     * @return uint256 of the bid id
     */
     function _getBidId() private view returns (uint256);
+
+    /**
+    * @dev Normalize to _fromToken decimals
+    * @param _decimals - uint256 of _fromToken decimals
+    * @param _value - uint256 of the amount to normalize
+    */
+    function _normalizeDecimals(
+        uint256 _decimals,
+        uint256 _value
+    )
+    internal pure returns (uint256 _result);
 
     /**
     * @dev Increments bid id
