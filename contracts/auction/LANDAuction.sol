@@ -503,6 +503,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             !(_shouldBurnTokens && _shouldForwardTokens),
             "The token should be either burned or transferred"
         );
+        require(
+            !_shouldForwardTokens || 
+            (_shouldForwardTokens && _forwardTarget.isContract()),
+            "The token should be transferred to a deployed contract"
+        );
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
         tokensAllowed[_address] = Token({

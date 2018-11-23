@@ -609,130 +609,6 @@ contract('LANDAuction', function([
     })
   })
 
-  describe('setLandsLimitPerBid', function() {
-    it('should change lands limit', async function() {
-      let _landLimit = await landAuction.landsLimitPerBid()
-      _landLimit.should.be.bignumber.equal(landsLimitPerBid)
-
-      await landAuction.setLandsLimitPerBid(40, fromOwner)
-
-      _landLimit = await landAuction.landsLimitPerBid()
-      _landLimit.should.be.bignumber.equal(40)
-    })
-
-    it('reverts when changing to 0', async function() {
-      await assertRevert(landAuction.setLandsLimitPerBid(0, fromOwner))
-    })
-
-    it('reverts when no-owner trying to change it', async function() {
-      await assertRevert(
-        landAuction.setLandsLimitPerBid(landsLimitPerBid, fromHacker)
-      )
-    })
-  })
-
-  describe('setGasPriceLimit', function() {
-    it('should change gas price limit', async function() {
-      const newGasPriceLimit = 8
-      let _gasPriceLimit = await landAuction.gasPriceLimit()
-      _gasPriceLimit.should.be.bignumber.equal(gasPriceLimit)
-
-      await landAuction.setGasPriceLimit(newGasPriceLimit, fromOwner)
-
-      _gasPriceLimit = await landAuction.gasPriceLimit()
-      _gasPriceLimit.should.be.bignumber.equal(newGasPriceLimit)
-    })
-
-    it('reverts when changing to 0', async function() {
-      await assertRevert(landAuction.setGasPriceLimit(0, fromOwner))
-    })
-
-    it('reverts when no-owner trying to change it', async function() {
-      await assertRevert(
-        landAuction.setGasPriceLimit(gasPriceLimit, fromHacker)
-      )
-    })
-  })
-
-  describe('finishAuction', function() {
-    it('should finish auction', async function() {
-      const { logs } = await landAuction.finishAuction(fromOwner)
-      const time = getBlockchainTime()
-
-      logs.length.should.be.equal(1)
-
-      assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
-        _caller: owner,
-        _time: time.toString(),
-        _price: getPriceWithLinearFunction(time - startTime).toString()
-      })
-
-      const status = await landAuction.status()
-      status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.finished)
-    })
-
-    it('reverts when trying to re-finish auction', async function() {
-      await landAuction.finishAuction(fromOwner)
-      await assertRevert(landAuction.finishAuction(fromOwner))
-    })
-
-    it('reverts when no-owner finishing auction', async function() {
-      await assertRevert(landAuction.finishAuction(fromHacker))
-    })
-  })
-
-  describe('getCurrentPrice', function() {
-    it('should match desire prices', async function() {
-      for (let i = 0; i < 20; i++) {
-        const price = await landAuction.getPrice(duration.days(i))
-        weiToDecimal(price).should.be.equal(weiToDecimal(PRICES[i] || endPrice))
-      }
-    })
-
-    it('should get current price', async function() {
-      // Day 0
-      let oldPrice = await getCurrentPrice()
-      let price = oldPrice
-      let time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-
-      // Day 5
-      await increaseTime(duration.days(5))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14
-      await increaseTime(duration.days(8))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14 and 10 hours
-      await increaseTime(duration.hours(10))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-    })
-
-    it('should get end price when auction time finished', async function() {
-      await increaseTime(auctionDuration)
-      let price = await landAuction.getCurrentPrice()
-
-      price.should.be.bignumber.equal(endPrice)
-
-      await increaseTime(duration.days(1))
-      price = await landAuction.getCurrentPrice()
-
-      price.should.be.bignumber.equal(endPrice)
-    })
-  })
-
   describe('bid', function() {
     it('should bid', async function() {
       const { logs } = await landAuction.bid(
@@ -1383,6 +1259,130 @@ contract('LANDAuction', function([
     })
   })
 
+  describe('setLandsLimitPerBid', function() {
+    it('should change lands limit', async function() {
+      let _landLimit = await landAuction.landsLimitPerBid()
+      _landLimit.should.be.bignumber.equal(landsLimitPerBid)
+
+      await landAuction.setLandsLimitPerBid(40, fromOwner)
+
+      _landLimit = await landAuction.landsLimitPerBid()
+      _landLimit.should.be.bignumber.equal(40)
+    })
+
+    it('reverts when changing to 0', async function() {
+      await assertRevert(landAuction.setLandsLimitPerBid(0, fromOwner))
+    })
+
+    it('reverts when no-owner trying to change it', async function() {
+      await assertRevert(
+        landAuction.setLandsLimitPerBid(landsLimitPerBid, fromHacker)
+      )
+    })
+  })
+
+  describe('setGasPriceLimit', function() {
+    it('should change gas price limit', async function() {
+      const newGasPriceLimit = 8
+      let _gasPriceLimit = await landAuction.gasPriceLimit()
+      _gasPriceLimit.should.be.bignumber.equal(gasPriceLimit)
+
+      await landAuction.setGasPriceLimit(newGasPriceLimit, fromOwner)
+
+      _gasPriceLimit = await landAuction.gasPriceLimit()
+      _gasPriceLimit.should.be.bignumber.equal(newGasPriceLimit)
+    })
+
+    it('reverts when changing to 0', async function() {
+      await assertRevert(landAuction.setGasPriceLimit(0, fromOwner))
+    })
+
+    it('reverts when no-owner trying to change it', async function() {
+      await assertRevert(
+        landAuction.setGasPriceLimit(gasPriceLimit, fromHacker)
+      )
+    })
+  })
+
+  describe('finishAuction', function() {
+    it('should finish auction', async function() {
+      const { logs } = await landAuction.finishAuction(fromOwner)
+      const time = getBlockchainTime()
+
+      logs.length.should.be.equal(1)
+
+      assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
+        _caller: owner,
+        _time: time.toString(),
+        _price: getPriceWithLinearFunction(time - startTime).toString()
+      })
+
+      const status = await landAuction.status()
+      status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.finished)
+    })
+
+    it('reverts when trying to re-finish auction', async function() {
+      await landAuction.finishAuction(fromOwner)
+      await assertRevert(landAuction.finishAuction(fromOwner))
+    })
+
+    it('reverts when no-owner finishing auction', async function() {
+      await assertRevert(landAuction.finishAuction(fromHacker))
+    })
+  })
+
+  describe('getCurrentPrice', function() {
+    it('should match desire prices', async function() {
+      for (let i = 0; i < 20; i++) {
+        const price = await landAuction.getPrice(duration.days(i))
+        weiToDecimal(price).should.be.equal(weiToDecimal(PRICES[i] || endPrice))
+      }
+    })
+
+    it('should get current price', async function() {
+      // Day 0
+      let oldPrice = await getCurrentPrice()
+      let price = oldPrice
+      let time = getBlockchainTime()
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
+
+      // Day 5
+      await increaseTime(duration.days(5))
+      price = await getCurrentPrice()
+      price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
+      oldPrice = price
+
+      // Day 14
+      await increaseTime(duration.days(8))
+      price = await getCurrentPrice()
+      price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
+      oldPrice = price
+
+      // Day 14 and 10 hours
+      await increaseTime(duration.hours(10))
+      price = await getCurrentPrice()
+      price.should.be.lt(oldPrice)
+      time = getBlockchainTime()
+      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
+    })
+
+    it('should get end price when auction time finished', async function() {
+      await increaseTime(auctionDuration)
+      let price = await landAuction.getCurrentPrice()
+
+      price.should.be.bignumber.equal(endPrice)
+
+      await increaseTime(duration.days(1))
+      price = await landAuction.getCurrentPrice()
+
+      price.should.be.bignumber.equal(endPrice)
+    })
+  })
+
   describe('setDex', function() {
     it('should set dex', async function() {
       let address = await landAuction.dex()
@@ -1444,6 +1444,28 @@ contract('LANDAuction', function([
       isAllowed.should.be.equal(true)
     })
 
+    it('should allow a token that should burn', async function() {
+      await landAuction.allowToken(
+        dclToken.address,
+        MAX_DECIMALS,
+        true,
+        false,
+        0,
+        fromOwner
+      )
+    })
+
+    it('should allow a token that should forward', async function() {
+      await landAuction.allowToken(
+        dclToken.address,
+        MAX_DECIMALS,
+        false,
+        true,
+        tokenKiller.address,
+        fromOwner
+      )
+    })
+
     it('reverts when allow a token already allowed', async function() {
       await assertRevert(
         landAuction.allowToken(
@@ -1454,6 +1476,25 @@ contract('LANDAuction', function([
           0,
           fromOwner
         )
+      )
+    })
+
+    it('reverts when trying to allow a token that should burn and should forward', async function() {
+      await assertRevert(
+        landAuction.allowToken(
+          dclToken.address,
+          12,
+          true,
+          true,
+          tokenKiller.address,
+          fromOwner
+        )
+      )
+    })
+
+    it('reverts when trying to allow a token that should forward with 0 address', async function() {
+      await assertRevert(
+        landAuction.allowToken(dclToken.address, 12, false, true, 0, fromOwner)
       )
     })
 
