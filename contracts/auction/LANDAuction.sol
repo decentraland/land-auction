@@ -186,13 +186,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Set convertion fee rate
-    * @param _fee - uint256 for the new convertion rate
+    * @dev Set conversion fee rate
+    * @param _fee - uint256 for the new conversion rate
     */
-    function setConvertionFee(uint256 _fee) external onlyOwner {
-        require(_fee < 200 && _fee >= 100, "Convertion fee should be >= 100 and < 200");
-        emit ConvertionFeeChanged(msg.sender, convertionFee, _fee);
-        convertionFee = _fee;
+    function setConversionFee(uint256 _fee) external onlyOwner {
+        require(_fee < 200 && _fee >= 100, "Conversion fee should be >= 100 and < 200");
+        emit ConversionFeeChanged(msg.sender, conversionFee, _fee);
+        conversionFee = _fee;
     }
 
     /**
@@ -328,7 +328,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
-    * the convertion fee.
+    * the conversion fee.
     * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
@@ -343,7 +343,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         totalPrice = _totalPrice;
         Token memory fromToken = tokensAllowed[address(_fromToken)];
 
-        uint totalPriceWithDeposit = totalPrice.mul(convertionFee).div(100);
+        uint totalPriceWithDeposit = totalPrice.mul(conversionFee).div(100);
 
         // Save prev _fromToken balance 
         uint256 prevTokenBalance = _fromToken.balanceOf(address(this));
@@ -402,7 +402,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Remove approval of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), 0), "Error remove approval");
 
-        emit BidConvertion(
+        emit BidConversion(
             _bidId,
             address(_fromToken),
             totalPrice,

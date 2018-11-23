@@ -276,8 +276,8 @@ contract ITokenConverter {
     * @param _srcToken - IERC20 token
     * @param _destToken - IERC20 token 
     * @param _srcAmount - uint256 amount to be converted
-    * @param _destAmount - uint256 amount to get after convertion
-    * @return bool true if the convertion was success
+    * @param _destAmount - uint256 amount to get after conversion
+    * @return bool true if the conversion was success
     */
     function convert(
         IERC20 _srcToken,
@@ -335,7 +335,7 @@ contract LANDAuctionStorage {
         bool isAllowed;
     }
 
-    uint256 public convertionFee = 105;
+    uint256 public conversionFee = 105;
     uint256 public totalBids = 0;
     Status public status;
     uint256 public gasPriceLimit;
@@ -362,7 +362,7 @@ contract LANDAuctionStorage {
       uint256 _endPrice
     );
 
-    event BidConvertion(
+    event BidConversion(
       uint256 _bidId,
       address indexed _token,
       uint256 _totalPriceInMana,
@@ -422,10 +422,10 @@ contract LANDAuctionStorage {
       address indexed _address
     );
 
-    event ConvertionFeeChanged(
+    event ConversionFeeChanged(
       address indexed _caller,
-      uint256 _oldConvertionFee,
-      uint256 _convertionFee
+      uint256 _oldConversionFee,
+      uint256 _conversionFee
     );
 }
 
@@ -610,13 +610,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Set convertion fee rate
-    * @param _fee - uint256 for the new convertion rate
+    * @dev Set conversion fee rate
+    * @param _fee - uint256 for the new conversion rate
     */
-    function setConvertionFee(uint256 _fee) external onlyOwner {
-        require(_fee < 200 && _fee >= 100, "Convertion fee should be >= 100 and < 200");
-        emit ConvertionFeeChanged(msg.sender, convertionFee, _fee);
-        convertionFee = _fee;
+    function setConversionFee(uint256 _fee) external onlyOwner {
+        require(_fee < 200 && _fee >= 100, "Conversion fee should be >= 100 and < 200");
+        emit ConversionFeeChanged(msg.sender, conversionFee, _fee);
+        conversionFee = _fee;
     }
 
     /**
@@ -752,7 +752,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Convert allowed token to MANA and transfer the change in the original token
     * Note that we will use the slippageRate cause it has a 3% buffer and a deposit of 5% to cover
-    * the convertion fee.
+    * the conversion fee.
     * @param _bidId - uint256 of the bid Id
     * @param _fromToken - ERC20 token to be converted
     * @param _totalPrice - uint256 of the total amount in MANA
@@ -767,7 +767,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         totalPrice = _totalPrice;
         Token memory fromToken = tokensAllowed[address(_fromToken)];
 
-        uint totalPriceWithDeposit = totalPrice.mul(convertionFee).div(100);
+        uint totalPriceWithDeposit = totalPrice.mul(conversionFee).div(100);
 
         // Save prev _fromToken balance 
         uint256 prevTokenBalance = _fromToken.balanceOf(address(this));
@@ -826,7 +826,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Remove approval of _fromToken owned by contract to be used by dex contract
         require(_fromToken.approve(address(dex), 0), "Error remove approval");
 
-        emit BidConvertion(
+        emit BidConversion(
             _bidId,
             address(_fromToken),
             totalPrice,
