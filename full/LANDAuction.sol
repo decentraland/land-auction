@@ -452,7 +452,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @param _xPoints - uint256[] of seconds
     * @param _yPoints - uint256[] of prices
     * @param _startTime - uint256 timestamp in seconds when the auction will start
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single bid
+    * @param _landsLimitPerBid - uint256 LAND limit for a single bid
     * @param _gasPriceLimit - uint256 gas price limit for a single bid
     * @param _manaToken - address of the MANA token
     * @param _landRegistry - address of the LANDRegistry
@@ -615,7 +615,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Current LAND price. 
-    * Note that if the auction was not started returns the initial price and when
+    * Note that if the auction has not started returns the initial price and when
     * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
@@ -876,11 +876,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /**
-    * @dev Set LANDs limit for the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
+    * @dev Set LAND for the auction
+    * @param _landsLimitPerBid - uint256 LAND limit for a single id
     */
     function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner {
-        require(_landsLimitPerBid > 0, "The lands limit should be greater than 0");
+        require(_landsLimitPerBid > 0, "The LAND limit should be greater than 0");
         emit LandsLimitPerBidChanged(msg.sender, landsLimitPerBid, _landsLimitPerBid);
         landsLimitPerBid = _landsLimitPerBid;
     }

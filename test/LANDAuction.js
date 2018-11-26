@@ -29,7 +29,7 @@ function getBlockchainTime(blockNumber = 'latest') {
   return web3.eth.getBlock(blockNumber).timestamp
 }
 
-function parseFloatWithDecimal(num, decimals = 1) {
+function parseFloatWithDecimal(num, decimals = 0) {
   return parseFloat(parseFloat(num).toFixed(decimals))
 }
 
@@ -71,7 +71,8 @@ function normalizeEvent(log) {
       key === '_price' ||
       key === '_totalPrice' ||
       key === '_total' ||
-      key === '_totalPriceInMana'
+      key === '_totalPriceInMana' ||
+      key === '_totalPriceInToken'
     ) {
       newArgs[key] = weiToDecimal(args[key]).toString()
     }
@@ -426,7 +427,7 @@ contract('LANDAuction', function([
       )
     })
 
-    it('reverts if creator creates with incorrect values :: duration < 1 day', async function() {
+    it('reverts if creator creates with incorrect values :: duration <= 1 day', async function() {
       await assertRevert(
         LANDAuction.new(
           [...time, duration.days(1)],
@@ -623,7 +624,7 @@ contract('LANDAuction', function([
       )
 
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
-      const price = getPriceWithLinearFunction(time)
+      const price = getPriceWithLinearFunction(time, false)
 
       logs.length.should.be.equal(2)
 
@@ -637,10 +638,8 @@ contract('LANDAuction', function([
         _bidId: '0',
         _beneficiary: bidder,
         _token: manaToken.address,
-        _price: price.toString(),
-        _totalPrice: weiToDecimal(
-          getPriceWithLinearFunction(time, false) * xs.length
-        ).toString(),
+        _price: weiToDecimal(price).toString(),
+        _totalPrice: weiToDecimal(price * xs.length).toString(),
         _xs: xs,
         _ys: ys
       })
@@ -685,7 +684,8 @@ contract('LANDAuction', function([
 
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
-      const price = getPriceWithLinearFunction(time)
+      const price = getPriceWithLinearFunction(time, false)
+      const totalPriceInMana = weiToDecimal(price * xs.length)
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
@@ -697,10 +697,8 @@ contract('LANDAuction', function([
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: daiToken.address,
-        _totalPriceInMana: weiToDecimal(
-          getPriceWithLinearFunction(time, false) * xs.length
-        ).toString(),
-        _totalPriceInToken: scientificToDecimal(totalPriceInToken),
+        _totalPriceInMana: totalPriceInMana.toString(),
+        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
         _tokensKept: '0'
       })
 
@@ -714,10 +712,8 @@ contract('LANDAuction', function([
         _bidId: '0',
         _beneficiary: bidderWithOnlyDAI,
         _token: daiToken.address,
-        _price: price.toString(),
-        _totalPrice: weiToDecimal(
-          getPriceWithLinearFunction(time, false) * xs.length
-        ).toString(),
+        _price: weiToDecimal(price).toString(),
+        _totalPrice: totalPriceInMana.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -779,8 +775,8 @@ contract('LANDAuction', function([
 
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
-      const price = getPriceWithLinearFunction(time)
-
+      const price = getPriceWithLinearFunction(time, false)
+      const totalPriceInMana = weiToDecimal(price * xs.length)
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
@@ -790,10 +786,8 @@ contract('LANDAuction', function([
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: dclToken.address,
-        _totalPriceInMana: weiToDecimal(
-          getPriceWithLinearFunction(time, false) * xs.length
-        ).toString(),
-        _totalPriceInToken: totalPriceInToken.toString(),
+        _totalPriceInMana: totalPriceInMana.toString(),
+        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
         _tokensKept: '0'
       })
 
@@ -807,10 +801,8 @@ contract('LANDAuction', function([
         _bidId: '0',
         _beneficiary: bidder,
         _token: dclToken.address,
-        _price: price.toString(),
-        _totalPrice: weiToDecimal(
-          getPriceWithLinearFunction(time, false) * xs.length
-        ).toString(),
+        _price: weiToDecimal(price).toString(),
+        _totalPrice: totalPriceInMana.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -867,9 +859,11 @@ contract('LANDAuction', function([
       logs.length.should.be.equal(4)
 
       // Check Log
-      const time = getBlockchainTime(logs[0].blockNumber)
-      const price = getPriceWithLinearFunction(time - startTime)
-      const totalPrice = price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+      const time = getBlockchainTime(logs[0].blockNumber) - startTime
+      const price = getPriceWithLinearFunction(time, false)
+      const totalPriceInMana = weiToDecimal(
+        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+      )
       const totalPriceInToken = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
@@ -881,8 +875,8 @@ contract('LANDAuction', function([
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: daiToken.address,
-        _totalPriceInMana: totalPrice.toString(),
-        _totalPriceInToken: scientificToDecimal(totalPriceInToken),
+        _totalPriceInMana: totalPriceInMana.toString(),
+        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
         _tokensKept: tokensKept.toFixed(0) // remove decimal
       })
 
@@ -902,8 +896,8 @@ contract('LANDAuction', function([
         _bidId: '0',
         _beneficiary: bidder,
         _token: daiToken.address,
-        _price: price.toString(),
-        _totalPrice: totalPrice.toString(),
+        _price: weiToDecimal(price).toString(),
+        _totalPrice: totalPriceInMana.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -951,6 +945,28 @@ contract('LANDAuction', function([
         gasPrice: gasPriceLimit
       })
 
+      // Check Log
+      const time = getBlockchainTime(logs[0].blockNumber) - startTime
+      const price = getPriceWithLinearFunction(time, false)
+      const totalPriceInMana = weiToDecimal(
+        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+      )
+      const totalPriceInToken = await kyberMock.getReturn(
+        manaToken.address,
+        dclToken.address,
+        logs[3].args._price.mul(xs.length)
+      )
+      // Keep 5% percentage of the token
+      const tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+
+      assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
+        _bidId: '0',
+        _token: dclToken.address,
+        _totalPriceInMana: totalPriceInMana.toString(),
+        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
+        _tokensKept: tokensKept.toFixed(0) // remove decimal
+      })
+
       assertEvent(logs[1], 'TokenTransferred', {
         _bidId: '0',
         _token: dclToken.address,
@@ -962,6 +978,16 @@ contract('LANDAuction', function([
         _bidId: '0',
         _token: manaToken.address,
         _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+      })
+
+      assertEvent(normalizeEvent(logs[3]), 'BidSuccessful', {
+        _bidId: '0',
+        _beneficiary: bidder,
+        _token: dclToken.address,
+        _price: weiToDecimal(price).toString(),
+        _totalPrice: totalPriceInMana.toString(),
+        _xs: xs,
+        _ys: ys
       })
 
       // Check DCL balance of LAND Auction contract
@@ -1279,7 +1305,7 @@ contract('LANDAuction', function([
   })
 
   describe('setLandsLimitPerBid', function() {
-    it('should change lands limit', async function() {
+    it('should change LAND limit', async function() {
       let _landLimit = await landAuction.landsLimitPerBid()
       _landLimit.should.be.bignumber.equal(landsLimitPerBid)
 
@@ -1340,7 +1366,7 @@ contract('LANDAuction', function([
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.finished)
     })
 
-    it('reverts when trying to re-finish auction', async function() {
+    it('reverts when trying to finish the auction twice', async function() {
       await landAuction.finishAuction(fromOwner)
       await assertRevert(landAuction.finishAuction(fromOwner))
     })
