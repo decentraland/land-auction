@@ -34,14 +34,15 @@ contract LANDAuctionStorage {
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
-
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
-    Func[] internal curves;
+    uint256 public totalManaBurned = 0;
+    uint256 public startTime;
+    uint256 public endTime;
 
+    Func[] internal curves;
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startTime;
     uint256 internal duration;
 
     event AuctionCreated(

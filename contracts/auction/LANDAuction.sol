@@ -147,8 +147,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _ys
         );  
 
-        // Increment bids count
+        // Increments bids count
         _incrementBids();
+
+        // Increments total MANA burned
+        totalManaBurned = totalManaBurned.add(manaAmountToBurn);
     }
 
     /** 
@@ -435,9 +438,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function finishAuction() public onlyOwner {
         require(status != Status.finished, "The auction is finished");
-        status = Status.finished;
 
         uint256 currentPrice = getCurrentPrice();
+
+        status = Status.finished;
+        endTime = block.timestamp;
+
         emit AuctionEnded(msg.sender, block.timestamp, currentPrice);
     }
 
