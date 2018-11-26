@@ -652,6 +652,9 @@ contract('LANDAuction', function([
 
       const balance = await manaToken.balanceOf(landAuction.address)
       balance.should.be.bignumber.equal(0)
+
+      const totalManaBurned = await landAuction.totalManaBurned()
+      totalManaBurned.should.be.bignumber.equal(logs[1].args._totalPrice)
     })
 
     it('should bid with other tokens', async function() {
@@ -750,6 +753,9 @@ contract('LANDAuction', function([
         bidderWithOnlyDAIBalance
       )
       manaBalanceOfBidderWithOnlyDAIBalance.should.be.bignumber.equal(0)
+
+      const totalManaBurned = await landAuction.totalManaBurned()
+      totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
     })
 
     it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
@@ -822,6 +828,9 @@ contract('LANDAuction', function([
       // Mana of bidder should keep the same or increase
       const bidderMANABalance = await manaToken.balanceOf(bidder)
       bidderMANABalance.should.be.bignumber.gte(web3.toWei(10, 'ether'))
+
+      const totalManaBurned = await landAuction.totalManaBurned()
+      totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
     })
 
     it('should bid and burn tokens', async function() {
@@ -915,6 +924,10 @@ contract('LANDAuction', function([
       balance.should.be.bignumber.equal(
         bidderDAIPrevBalance.minus(logs[0].args._totalPriceInToken)
       )
+
+      // Check total MANA burned
+      const totalManaBurned = await landAuction.totalManaBurned()
+      totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
     })
 
     it('should bid and forward funds', async function() {
@@ -1001,6 +1014,10 @@ contract('LANDAuction', function([
       // Check DCL balance of Token Killer contract
       balance = await dclToken.balanceOf(tokenKiller.address)
       balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+
+      // Check total MANA burned
+      const totalManaBurned = await landAuction.totalManaBurned()
+      totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
     })
 
     it('should increase bid id', async function() {
@@ -1008,6 +1025,8 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
+      let totalManaBurned = res.logs[1].args._totalPrice
+
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '0',
         _token: manaToken.address,
@@ -1024,6 +1043,7 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
+      totalManaBurned = totalManaBurned.plus(res.logs[1].args._totalPrice)
 
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '1',
@@ -1041,6 +1061,7 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
+      totalManaBurned = totalManaBurned.plus(res.logs[1].args._totalPrice)
 
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '2',
@@ -1053,6 +1074,10 @@ contract('LANDAuction', function([
         _xs: [12],
         _ys: [13]
       })
+
+      // Check total MANA burned
+      const manaBurned = await landAuction.totalManaBurned()
+      manaBurned.should.be.bignumber.equal(totalManaBurned)
     })
 
     it('should keep balance of LANDAuction contract at 0', async function() {
@@ -1364,6 +1389,9 @@ contract('LANDAuction', function([
 
       const status = await landAuction.status()
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.finished)
+
+      const endTime = await landAuction.endTime()
+      endTime.should.be.bignumber.equal(getBlockchainTime(logs[0].blockNumber))
     })
 
     it('reverts when trying to finish the auction twice', async function() {

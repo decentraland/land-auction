@@ -345,14 +345,15 @@ contract LANDAuctionStorage {
     uint256 public landsLimitPerBid;
     ERC20 public manaToken;
     LANDRegistry public landRegistry;
-    
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
-    Func[] internal curves;
+    uint256 public totalManaBurned = 0;
+    uint256 public startTime;
+    uint256 public endTime;
 
+    Func[] internal curves;
     uint256 internal initialPrice;
     uint256 internal endPrice;
-    uint256 internal startTime;
     uint256 internal duration;
 
     event AuctionCreated(
@@ -581,8 +582,11 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             _ys
         );  
 
-        // Increment bids count
+        // Increments bids count
         _incrementBids();
+
+        // Increments total MANA burned
+        totalManaBurned = totalManaBurned.add(manaAmountToBurn);
     }
 
     /** 
@@ -869,9 +873,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function finishAuction() public onlyOwner {
         require(status != Status.finished, "The auction is finished");
-        status = Status.finished;
 
         uint256 currentPrice = getCurrentPrice();
+
+        status = Status.finished;
+        endTime = block.timestamp;
+
         emit AuctionEnded(msg.sender, block.timestamp, currentPrice);
     }
 
