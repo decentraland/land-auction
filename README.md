@@ -187,7 +187,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Current LAND price.
-    * Note that if the auction was not started returns the initial price and when
+    * Note that if the auction has not started returns the initial price and when
     * the auction is finished return the endPrice
     * @return uint256 current LAND price
     */
@@ -288,7 +288,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Set LANDs limit for the auction
-    * @param _landsLimitPerBid - uint256 LANDs limit for a single id
+    * @param _landsLimitPerBid - uint256 LAND limit for a single id
     */
     function setLandsLimitPerBid(uint256 _landsLimitPerBid) public onlyOwner;
 
