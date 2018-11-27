@@ -339,12 +339,17 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Burn or forward the MANA and other tokens earned
+    * Note that as we will transfer or burn tokens from other contracts.
+    * We should burn MANA first to avoid a possible re-entrancy
     * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
     function _processFunds(uint256 _bidId, ERC20 _token) internal {
-        Token memory token = tokensAllowed[address(_token)];
+        // Burn MANA
+        _burnTokens(_bidId, manaToken);
 
+        // Burn or forward token if it is not MANA
+        Token memory token = tokensAllowed[address(_token)];
         if (_token != manaToken) {
             if (token.shouldBurnTokens) {
                 _burnTokens(_bidId, _token);
@@ -352,10 +357,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             if (token.shouldForwardTokens) {
                 _forwardTokens(_bidId, token.forwardTarget, _token);
             }   
-            
         }
-
-        _burnTokens(_bidId, manaToken);
     }
 
     /**
@@ -441,7 +443,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         status = Status.finished;
         endTime = block.timestamp;
 
-        emit AuctionEnded(msg.sender, block.timestamp, currentPrice);
+        emit AuctionFinished(msg.sender, block.timestamp, currentPrice);
     }
 
     /**

@@ -66,13 +66,12 @@ function normalizeEvent(log) {
   const { args } = log
   for (let key in args) {
     newArgs[key] = args[key]
-    // _price, _totalPrice and _total to wei & two decimals due different round method between languages
     if (
-      key === '_price' ||
-      key === '_totalPrice' ||
+      key === '_pricePerLandInMana' ||
+      key === '_manaAmountToBurn' ||
       key === '_total' ||
-      key === '_totalPriceInMana' ||
-      key === '_totalPriceInToken'
+      key === '_requiredManaAmountToBurn' ||
+      key === '_amountOfTokenConverted'
     ) {
       newArgs[key] = weiToDecimal(args[key]).toString()
     }
@@ -631,15 +630,15 @@ contract('LANDAuction', function([
       assertEvent(logs[0], 'TokenBurned', {
         _bidId: '0',
         _token: manaToken.address,
-        _total: scientificToDecimal(logs[1].args._totalPrice)
+        _total: scientificToDecimal(logs[1].args._manaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(logs[1]), 'BidSuccessful', {
         _bidId: '0',
         _beneficiary: bidder,
         _token: manaToken.address,
-        _price: weiToDecimal(price).toString(),
-        _totalPrice: weiToDecimal(price * xs.length).toString(),
+        _pricePerLandInMana: weiToDecimal(price).toString(),
+        _manaAmountToBurn: weiToDecimal(price * xs.length).toString(),
         _xs: xs,
         _ys: ys
       })
@@ -654,7 +653,7 @@ contract('LANDAuction', function([
       balance.should.be.bignumber.equal(0)
 
       const totalManaBurned = await landAuction.totalManaBurned()
-      totalManaBurned.should.be.bignumber.equal(logs[1].args._totalPrice)
+      totalManaBurned.should.be.bignumber.equal(logs[1].args._manaAmountToBurn)
 
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
@@ -692,11 +691,11 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
-      const totalPriceInMana = weiToDecimal(price * xs.length)
-      const totalPriceInToken = await kyberMock.getReturn(
+      const requiredManaAmountToBurn = weiToDecimal(price * xs.length)
+      const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
-        logs[0].args._totalPriceInMana
+        logs[0].args._requiredManaAmountToBurn
       )
 
       logs.length.should.be.equal(3)
@@ -704,23 +703,25 @@ contract('LANDAuction', function([
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: daiToken.address,
-        _totalPriceInMana: totalPriceInMana.toString(),
-        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
-        _tokensKept: '0'
+        _requiredManaAmountToBurn: requiredManaAmountToBurn.toString(),
+        _amountOfTokenConverted: weiToDecimal(
+          amountOfTokenConverted
+        ).toString(),
+        _requiredTokenBalance: '0'
       })
 
       assertEvent(logs[1], 'TokenBurned', {
         _bidId: '0',
         _token: manaToken.address,
-        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+        _total: scientificToDecimal(logs[0].args._requiredManaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(logs[2]), 'BidSuccessful', {
         _bidId: '0',
         _beneficiary: bidderWithOnlyDAI,
         _token: daiToken.address,
-        _price: weiToDecimal(price).toString(),
-        _totalPrice: totalPriceInMana.toString(),
+        _pricePerLandInMana: weiToDecimal(price).toString(),
+        _manaAmountToBurn: requiredManaAmountToBurn.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -759,7 +760,7 @@ contract('LANDAuction', function([
       manaBalanceOfBidderWithOnlyDAIBalance.should.be.bignumber.equal(0)
 
       const totalManaBurned = await landAuction.totalManaBurned()
-      totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
+      totalManaBurned.should.be.bignumber.equal(logs[2].args._manaAmountToBurn)
 
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
@@ -790,33 +791,35 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
-      const totalPriceInMana = weiToDecimal(price * xs.length)
-      const totalPriceInToken = await kyberMock.getReturn(
+      const requiredManaAmountToBurn = weiToDecimal(price * xs.length)
+      const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
-        logs[0].args._totalPriceInMana
+        logs[0].args._requiredManaAmountToBurn
       )
 
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: dclToken.address,
-        _totalPriceInMana: totalPriceInMana.toString(),
-        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
-        _tokensKept: '0'
+        _requiredManaAmountToBurn: requiredManaAmountToBurn.toString(),
+        _amountOfTokenConverted: weiToDecimal(
+          amountOfTokenConverted
+        ).toString(),
+        _requiredTokenBalance: '0'
       })
 
       assertEvent(logs[1], 'TokenBurned', {
         _bidId: '0',
         _token: manaToken.address,
-        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+        _total: scientificToDecimal(logs[0].args._requiredManaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(logs[2]), 'BidSuccessful', {
         _bidId: '0',
         _beneficiary: bidder,
         _token: dclToken.address,
-        _price: weiToDecimal(price).toString(),
-        _totalPrice: totalPriceInMana.toString(),
+        _pricePerLandInMana: weiToDecimal(price).toString(),
+        _manaAmountToBurn: requiredManaAmountToBurn.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -838,7 +841,7 @@ contract('LANDAuction', function([
       bidderMANABalance.should.be.bignumber.gte(web3.toWei(10, 'ether'))
 
       const totalManaBurned = await landAuction.totalManaBurned()
-      totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
+      totalManaBurned.should.be.bignumber.equal(logs[2].args._manaAmountToBurn)
 
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
@@ -882,43 +885,47 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
-      const totalPriceInMana = weiToDecimal(
+      const requiredManaAmountToBurn = weiToDecimal(
         price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
       )
-      const totalPriceInToken = await kyberMock.getReturn(
+      const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
         daiToken.address,
-        logs[3].args._price.mul(xs.length)
+        logs[3].args._pricePerLandInMana.mul(xs.length)
       )
       // Keep 5% percentage of the token
-      const tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+      const requiredTokenBalance = amountOfTokenConverted.mul(
+        PERCENTAGE_OF_TOKEN_TO_KEEP
+      )
 
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: daiToken.address,
-        _totalPriceInMana: totalPriceInMana.toString(),
-        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
-        _tokensKept: tokensKept.toFixed(0) // remove decimal
+        _requiredManaAmountToBurn: requiredManaAmountToBurn.toString(),
+        _amountOfTokenConverted: weiToDecimal(
+          amountOfTokenConverted
+        ).toString(),
+        _requiredTokenBalance: requiredTokenBalance.toFixed(0) // remove decimal
       })
 
       assertEvent(logs[1], 'TokenBurned', {
         _bidId: '0',
-        _token: daiToken.address,
-        _total: scientificToDecimal(logs[0].args._tokensKept)
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._requiredManaAmountToBurn)
       })
 
       assertEvent(logs[2], 'TokenBurned', {
         _bidId: '0',
-        _token: manaToken.address,
-        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+        _token: daiToken.address,
+        _total: scientificToDecimal(logs[0].args._requiredTokenBalance)
       })
 
       assertEvent(normalizeEvent(logs[3]), 'BidSuccessful', {
         _bidId: '0',
         _beneficiary: bidder,
         _token: daiToken.address,
-        _price: weiToDecimal(price).toString(),
-        _totalPrice: totalPriceInMana.toString(),
+        _pricePerLandInMana: weiToDecimal(price).toString(),
+        _manaAmountToBurn: requiredManaAmountToBurn.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -934,12 +941,12 @@ contract('LANDAuction', function([
       // Check balance of bidder
       balance = await daiToken.balanceOf(bidder)
       balance.should.be.bignumber.equal(
-        bidderDAIPrevBalance.minus(logs[0].args._totalPriceInToken)
+        bidderDAIPrevBalance.minus(logs[0].args._amountOfTokenConverted)
       )
 
       // Check total MANA burned
       const totalManaBurned = await landAuction.totalManaBurned()
-      totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
+      totalManaBurned.should.be.bignumber.equal(logs[3].args._manaAmountToBurn)
 
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
@@ -977,44 +984,50 @@ contract('LANDAuction', function([
       // Check Log
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
-      const totalPriceInMana = weiToDecimal(
+      const requiredManaAmountToBurn = weiToDecimal(
         price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
       )
-      const totalPriceInToken = await kyberMock.getReturn(
+      const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
         dclToken.address,
-        logs[3].args._price.mul(xs.length)
+        logs[3].args._pricePerLandInMana.mul(xs.length)
       )
       // Keep 5% percentage of the token
-      const tokensKept = totalPriceInToken.mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+      const requiredTokenBalance = amountOfTokenConverted.mul(
+        PERCENTAGE_OF_TOKEN_TO_KEEP
+      )
 
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
         _bidId: '0',
         _token: dclToken.address,
-        _totalPriceInMana: totalPriceInMana.toString(),
-        _totalPriceInToken: weiToDecimal(totalPriceInToken).toString(),
-        _tokensKept: tokensKept.toFixed(0) // remove decimal
+        _requiredManaAmountToBurn: requiredManaAmountToBurn.toString(),
+        _amountOfTokenConverted: weiToDecimal(
+          amountOfTokenConverted
+        ).toString(),
+        _requiredTokenBalance: requiredTokenBalance.toFixed(0) // remove decimal
       })
 
-      assertEvent(logs[1], 'TokenTransferred', {
+      assertEvent(logs[1], 'TokenBurned', {
+        _bidId: '0',
+        _token: manaToken.address,
+        _total: scientificToDecimal(logs[0].args._requiredManaAmountToBurn)
+      })
+
+      assertEvent(logs[2], 'TokenTransferred', {
         _bidId: '0',
         _token: dclToken.address,
         _to: tokenKiller.address,
-        _total: scientificToDecimal(logs[0].args._tokensKept.toString())
-      })
-
-      assertEvent(logs[2], 'TokenBurned', {
-        _bidId: '0',
-        _token: manaToken.address,
-        _total: scientificToDecimal(logs[0].args._totalPriceInMana)
+        _total: scientificToDecimal(
+          logs[0].args._requiredTokenBalance.toString()
+        )
       })
 
       assertEvent(normalizeEvent(logs[3]), 'BidSuccessful', {
         _bidId: '0',
         _beneficiary: bidder,
         _token: dclToken.address,
-        _price: weiToDecimal(price).toString(),
-        _totalPrice: totalPriceInMana.toString(),
+        _pricePerLandInMana: weiToDecimal(price).toString(),
+        _manaAmountToBurn: requiredManaAmountToBurn.toString(),
         _xs: xs,
         _ys: ys
       })
@@ -1029,11 +1042,11 @@ contract('LANDAuction', function([
 
       // Check DCL balance of Token Killer contract
       balance = await dclToken.balanceOf(tokenKiller.address)
-      balance.should.be.bignumber.equal(logs[0].args._tokensKept)
+      balance.should.be.bignumber.equal(logs[0].args._requiredTokenBalance)
 
       // Check total MANA burned
       const totalManaBurned = await landAuction.totalManaBurned()
-      totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
+      totalManaBurned.should.be.bignumber.equal(logs[3].args._manaAmountToBurn)
 
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
@@ -1045,12 +1058,12 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      let totalManaBurned = res.logs[1].args._totalPrice
+      let totalManaBurned = res.logs[1].args._manaAmountToBurn
 
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '0',
         _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+        _total: scientificToDecimal(res.logs[1].args._manaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
@@ -1063,12 +1076,12 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      totalManaBurned = totalManaBurned.plus(res.logs[1].args._totalPrice)
+      totalManaBurned = totalManaBurned.plus(res.logs[1].args._manaAmountToBurn)
 
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '1',
         _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+        _total: scientificToDecimal(res.logs[1].args._manaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
@@ -1081,12 +1094,12 @@ contract('LANDAuction', function([
         ...fromBidder,
         gasPrice: gasPriceLimit
       })
-      totalManaBurned = totalManaBurned.plus(res.logs[1].args._totalPrice)
+      totalManaBurned = totalManaBurned.plus(res.logs[1].args._manaAmountToBurn)
 
       assertEvent(res.logs[0], 'TokenBurned', {
         _bidId: '2',
         _token: manaToken.address,
-        _total: scientificToDecimal(res.logs[1].args._totalPrice)
+        _total: scientificToDecimal(res.logs[1].args._manaAmountToBurn)
       })
 
       assertEvent(normalizeEvent(res.logs[1]), 'BidSuccessful', {
@@ -1405,10 +1418,12 @@ contract('LANDAuction', function([
 
       logs.length.should.be.equal(1)
 
-      assertEvent(normalizeEvent(logs[0]), 'AuctionEnded', {
+      assertEvent(normalizeEvent(logs[0]), 'AuctionFinished', {
         _caller: owner,
         _time: time.toString(),
-        _price: getPriceWithLinearFunction(time - startTime).toString()
+        _pricePerLandInMana: getPriceWithLinearFunction(
+          time - startTime
+        ).toString()
       })
 
       const status = await landAuction.status()
@@ -1434,37 +1449,6 @@ contract('LANDAuction', function([
         const price = await landAuction.getPrice(duration.days(i))
         weiToDecimal(price).should.be.equal(weiToDecimal(PRICES[i] || endPrice))
       }
-    })
-
-    it('should get current price', async function() {
-      // Day 0
-      let oldPrice = await getCurrentPrice()
-      let price = oldPrice
-      let time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-
-      // Day 5
-      await increaseTime(duration.days(5))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14
-      await increaseTime(duration.days(8))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14 and 10 hours
-      await increaseTime(duration.hours(10))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
     })
 
     it('should get end price when auction time finished', async function() {

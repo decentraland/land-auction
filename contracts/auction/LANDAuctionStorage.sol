@@ -70,25 +70,25 @@ contract LANDAuctionStorage {
     event BidConversion(
       uint256 _bidId,
       address indexed _token,
-      uint256 _totalPriceInMana,
-      uint256 _totalPriceInToken,
-      uint256 _tokensKept
+      uint256 _requiredManaAmountToBurn,
+      uint256 _amountOfTokenConverted,
+      uint256 _requiredTokenBalance
     );
 
     event BidSuccessful(
       uint256 _bidId,
       address indexed _beneficiary,
       address indexed _token,
-      uint256 _price,
-      uint256 _totalPrice,
+      uint256 _pricePerLandInMana,
+      uint256 _manaAmountToBurn,
       int[] _xs,
       int[] _ys
     );
 
-    event AuctionEnded(
+    event AuctionFinished(
       address indexed _caller,
       uint256 _time,
-      uint256 _price
+      uint256 _pricePerLandInMana
     );
 
     event TokenBurned(
