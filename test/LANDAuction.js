@@ -657,8 +657,8 @@ contract('LANDAuction', function([
       totalManaBurned.should.be.bignumber.equal(logs[1].args._totalPrice)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length)
     })
 
     it('should bid with other tokens', async function() {
@@ -762,8 +762,8 @@ contract('LANDAuction', function([
       totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length)
     })
 
     it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
@@ -841,8 +841,8 @@ contract('LANDAuction', function([
       totalManaBurned.should.be.bignumber.equal(logs[2].args._totalPrice)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length)
     })
 
     it('should bid and burn tokens', async function() {
@@ -942,8 +942,8 @@ contract('LANDAuction', function([
       totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length)
     })
 
     it('should bid and forward funds', async function() {
@@ -1036,8 +1036,8 @@ contract('LANDAuction', function([
       totalManaBurned.should.be.bignumber.equal(logs[3].args._totalPrice)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length)
     })
 
     it('should increase bid id', async function() {
@@ -1100,8 +1100,8 @@ contract('LANDAuction', function([
       manaBurned.should.be.bignumber.equal(totalManaBurned)
 
       // Check total LAND bidded
-      const landsBidded = await landAuction.landsBidded()
-      landsBidded.should.be.bignumber.equal(xs.length + 2)
+      const totalLandsBidded = await landAuction.totalLandsBidded()
+      totalLandsBidded.should.be.bignumber.equal(xs.length + 2)
     })
 
     it('should keep balance of LANDAuction contract at 0', async function() {

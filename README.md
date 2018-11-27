@@ -377,7 +377,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     /**
     * @dev Update stats. It will update the following stats:
     * - totalBids
-    * - landsBidded
+    * - totalLandsBidded
     * - totalManaBurned
     * @param _landsBidded - uint256 of the number of LAND bidded
     * @param _manaAmountBurned - uint256 of the amount of MANA burned

@@ -348,7 +348,7 @@ contract LANDAuctionStorage {
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
     uint256 public totalManaBurned = 0;
-    uint256 public landsBidded = 0;
+    uint256 public totalLandsBidded = 0;
     uint256 public startTime;
     uint256 public endTime;
 
@@ -1067,7 +1067,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     */
     function _updateStats(uint256 _landsBidded, uint256 _manaAmountBurned) private {
         totalBids = totalBids.add(1);
-        landsBidded = landsBidded.add(_landsBidded);
+        totalLandsBidded = totalLandsBidded.add(_landsBidded);
         totalManaBurned = totalManaBurned.add(_manaAmountBurned);
     }
 }
