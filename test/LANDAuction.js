@@ -1451,15 +1451,16 @@ contract('LANDAuction', function([
       }
     })
 
-    it('should get current price', async function() {
-      // Day 0
+    it.only('should get current price', async function() {
+      // Day 1
+      await increaseTime(duration.days(1))
       let oldPrice = await getCurrentPrice()
-      let price = oldPrice
       let time = getBlockchainTime()
+      let price = oldPrice
       price.should.be.equal(getPriceWithLinearFunction(time - startTime))
 
       // Day 5
-      await increaseTime(duration.days(5))
+      await increaseTime(duration.days(4))
       price = await getCurrentPrice()
       price.should.be.lt(oldPrice)
       time = getBlockchainTime()
