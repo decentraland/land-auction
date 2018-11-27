@@ -50,6 +50,7 @@ contract LANDAuctionStorage {
     ITokenConverter public dex;
     mapping (address => Token) public tokensAllowed;
     uint256 public totalManaBurned = 0;
+    uint256 public totalLandsBidded = 0;
     uint256 public startTime;
     uint256 public endTime;
 

@@ -375,8 +375,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     internal pure returns (uint256 _result);
 
     /**
-    * @dev Increments bid id
+    * @dev Update stats. It will update the following stats:
+    * - totalBids
+    * - totalLandsBidded
+    * - totalManaBurned
+    * @param _landsBidded - uint256 of the number of LAND bidded
+    * @param _manaAmountBurned - uint256 of the amount of MANA burned
     */
-    function _incrementBids() private;
+    function _updateStats(uint256 _landsBidded, uint256 _manaAmountBurned) private;
 }
 ```
