@@ -368,25 +368,25 @@ contract LANDAuctionStorage {
     event BidConversion(
       uint256 _bidId,
       address indexed _token,
-      uint256 _totalPriceInMana,
-      uint256 _totalPriceInToken,
-      uint256 _tokensKept
+      uint256 _requiredManaAmountToBurn,
+      uint256 _amountOfTokenConverted,
+      uint256 _requiredTokenBalance
     );
 
     event BidSuccessful(
       uint256 _bidId,
       address indexed _beneficiary,
       address indexed _token,
-      uint256 _price,
-      uint256 _totalPrice,
+      uint256 _pricePerLandInMana,
+      uint256 _manaAmountToBurn,
       int[] _xs,
       int[] _ys
     );
 
-    event AuctionEnded(
+    event AuctionFinished(
       address indexed _caller,
       uint256 _time,
-      uint256 _price
+      uint256 _pricePerLandInMana
     );
 
     event TokenBurned(
@@ -775,12 +775,17 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Burn or forward the MANA and other tokens earned
+    * Note that as we will transfer or burn tokens from other contracts.
+    * We should burn MANA first to avoid a possible re-entrancy
     * @param _bidId - uint256 of the bid Id
     * @param _token - ERC20 token
     */
     function _processFunds(uint256 _bidId, ERC20 _token) internal {
-        Token memory token = tokensAllowed[address(_token)];
+        // Burn MANA
+        _burnTokens(_bidId, manaToken);
 
+        // Burn or forward token if it is not MANA
+        Token memory token = tokensAllowed[address(_token)];
         if (_token != manaToken) {
             if (token.shouldBurnTokens) {
                 _burnTokens(_bidId, _token);
@@ -788,10 +793,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
             if (token.shouldForwardTokens) {
                 _forwardTokens(_bidId, token.forwardTarget, _token);
             }   
-            
         }
-
-        _burnTokens(_bidId, manaToken);
     }
 
     /**
@@ -877,7 +879,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         status = Status.finished;
         endTime = block.timestamp;
 
-        emit AuctionEnded(msg.sender, block.timestamp, currentPrice);
+        emit AuctionFinished(msg.sender, block.timestamp, currentPrice);
     }
 
     /**
@@ -1061,7 +1063,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     }
 
     /** 
-    * @dev Update stats 
+    * @dev Update stats. It will update the following stats:
+    * - totalBids
+    * - totalLandsBidded
+    * - totalManaBurned
     * @param _landsBidded - uint256 of the number of LAND bidded
     * @param _manaAmountBurned - uint256 of the amount of MANA burned
     */
