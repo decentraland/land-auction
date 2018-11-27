@@ -1451,38 +1451,6 @@ contract('LANDAuction', function([
       }
     })
 
-    it.only('should get current price', async function() {
-      // Day 1
-      await increaseTime(duration.days(1))
-      let oldPrice = await getCurrentPrice()
-      let time = getBlockchainTime()
-      let price = oldPrice
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-
-      // Day 5
-      await increaseTime(duration.days(4))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14
-      await increaseTime(duration.days(8))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-      oldPrice = price
-
-      // Day 14 and 10 hours
-      await increaseTime(duration.hours(10))
-      price = await getCurrentPrice()
-      price.should.be.lt(oldPrice)
-      time = getBlockchainTime()
-      price.should.be.equal(getPriceWithLinearFunction(time - startTime))
-    })
-
     it('should get end price when auction time finished', async function() {
       await increaseTime(auctionDuration)
       let price = await landAuction.getCurrentPrice()
