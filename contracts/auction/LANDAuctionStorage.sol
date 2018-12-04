@@ -21,7 +21,7 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
-    uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
+    uint256 constant public PERCENTAGE_OF_TOKEN_BALANCE = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
     enum Status { created, finished }
