@@ -24,7 +24,7 @@ contract KyberConverter is ITokenConverter {
         uint256 _srcAmount,
         uint256 _destAmount
     ) 
-    external payable returns (uint256)
+    external returns (uint256)
     {
         // Save prev src token balance 
         uint256 prevSrcBalance = _srcToken.balanceOf(address(this));
@@ -41,17 +41,15 @@ contract KyberConverter is ITokenConverter {
             "Could not approve kyber to use _srcToken on behalf of this contract"
         );
 
-        uint256 minRate;
-        (, minRate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
-
         // Trade _srcAmount from _srcToken to _destToken
+        // Note that minConversionRate is set to 0 cause we want the lower rate possible
         uint256 amount = kyber.trade(
             _srcToken,
             _srcAmount,
             _destToken,
             address(this),
             _destAmount,
-            minRate,
+            0,
             walletId
         );
 
@@ -65,7 +63,7 @@ contract KyberConverter is ITokenConverter {
         require(amount == _destAmount, "Amount bought is not equal to dest amount");
 
         // Return the change of src token
-        uint256 change = _srcToken.balanceOf(address(this)) - prevSrcBalance;
+        uint256 change = _srcToken.balanceOf(address(this)).sub(prevSrcBalance);
         require(
             _srcToken.transfer(msg.sender, change),
             "Could not transfer change to sender"

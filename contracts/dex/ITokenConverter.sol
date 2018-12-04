@@ -20,7 +20,7 @@ contract ITokenConverter {
         IERC20 _destToken,
         uint256 _srcAmount,
         uint256 _destAmount
-        ) external payable returns (uint256);
+        ) external returns (uint256);
 
     /**
     * @dev Get exchange rate and slippage rate. 
