@@ -2,6 +2,7 @@ pragma solidity ^0.4.24;
 
 import "./ITokenConverter.sol";
 import "./IKyberNetwork.sol";
+import "../libs/SafeTransfer.sol";
 
 
 /**
@@ -9,6 +10,8 @@ import "./IKyberNetwork.sol";
 * Note that need to create it with a valid kyber address
 */
 contract KyberConverter is ITokenConverter {
+    using SafeTransfer for IERC20;
+
     IKyberNetwork internal  kyber;
     uint256 private constant MAX_UINT = uint256(0) - 1;
     address internal walletId;
@@ -31,7 +34,7 @@ contract KyberConverter is ITokenConverter {
 
         // Transfer tokens to be converted from msg.sender to this contract
         require(
-            _srcToken.transferFrom(msg.sender, address(this), _srcAmount),
+            _srcToken.safeTransferFrom(msg.sender, address(this), _srcAmount),
             "Could not transfer _srcToken to this contract"
         );
 
@@ -67,14 +70,14 @@ contract KyberConverter is ITokenConverter {
         // Return the change of src token
         uint256 change = _srcToken.balanceOf(address(this)) - prevSrcBalance;
         require(
-            _srcToken.transfer(msg.sender, change),
+            _srcToken.safeTransfer(msg.sender, change),
             "Could not transfer change to sender"
         );
 
 
         // Transfer amount of _destTokens to msg.sender
         require(
-            _destToken.transfer(msg.sender, amount),
+            _destToken.safeTransfer(msg.sender, amount),
             "Could not transfer amount of _destToken to msg.sender"
         );
 
