@@ -1447,6 +1447,11 @@ contract('LANDAuction', function([
       price = await landAuction.getCurrentPrice()
 
       price.should.be.bignumber.equal(endPrice)
+
+      await increaseTime(duration.days(10))
+      price = await landAuction.getCurrentPrice()
+
+      price.should.be.bignumber.equal(endPrice)
     })
   })
 
@@ -1543,6 +1548,32 @@ contract('LANDAuction', function([
           false,
           false,
           0,
+          fromOwner
+        )
+      )
+    })
+
+    it('reverts when forward token to LANDAuction address', async function() {
+      await assertRevert(
+        landAuction.allowToken(
+          dclToken.address,
+          MAX_DECIMALS,
+          false,
+          true,
+          landAuction.address,
+          fromOwner
+        )
+      )
+    })
+
+    it('reverts when forward token to the token address', async function() {
+      await assertRevert(
+        landAuction.allowToken(
+          dclToken.address,
+          MAX_DECIMALS,
+          false,
+          true,
+          dclToken.address,
           fromOwner
         )
       )
