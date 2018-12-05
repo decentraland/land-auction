@@ -380,20 +380,6 @@ contract('LANDAuction', function([
       status.should.be.bignumber.equal(AUCTION_STATUS_OP_CODES.created)
     })
 
-    it('should create with allowed tokens', async function() {
-      await LANDAuction.new(
-        time,
-        prices,
-        farAwayStartTime,
-        landsLimitPerBid,
-        gasPriceLimit,
-        manaToken.address,
-        landRegistry.address,
-        kyberConverter.address,
-        fromOwner
-      )
-    })
-
     it('reverts if creator creates with incorrect values :: initialPrice = 0', async function() {
       await assertRevert(
         LANDAuction.new(

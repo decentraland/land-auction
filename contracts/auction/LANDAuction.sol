@@ -306,7 +306,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 _srcAmount
     ) public view returns (uint256 rate) 
     {
-        (, rate) = dex.getExpectedRate(_srcToken, _destToken, _srcAmount);
+        (rate,) = dex.getExpectedRate(_srcToken, _destToken, _srcAmount);
     }
 
     /** 

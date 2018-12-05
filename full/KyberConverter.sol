@@ -174,7 +174,7 @@ contract KyberConverter is ITokenConverter {
         uint256 _srcAmount,
         uint256 _destAmount
     ) 
-    external payable returns (uint256)
+    external returns (uint256)
     {
         // Save prev src token balance 
         uint256 prevSrcBalance = _srcToken.balanceOf(address(this));
@@ -191,9 +191,6 @@ contract KyberConverter is ITokenConverter {
             "Could not approve kyber to use _srcToken on behalf of this contract"
         );
 
-        uint256 minRate;
-        (, minRate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
-
         // Trade _srcAmount from _srcToken to _destToken
         uint256 amount = kyber.trade(
             _srcToken,
@@ -201,7 +198,7 @@ contract KyberConverter is ITokenConverter {
             _destToken,
             address(this),
             _destAmount,
-            minRate,
+            0,
             walletId
         );
 
