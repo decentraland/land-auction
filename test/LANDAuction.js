@@ -22,7 +22,7 @@ const AUCTION_STATUS_OP_CODES = {
 const MAX_DECIMALS = 18
 const SPECIAL_DECIMALS = 12
 
-const PERCENTAGE_OF_TOKEN_TO_KEEP = 0.05
+const PERCENTAGE_OF_TOKEN_BALANCE = 0.05
 const CONVERTION_FEE = 105
 
 function getBlockchainTime(blockNumber = 'latest') {
@@ -886,7 +886,7 @@ contract('LANDAuction', function([
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
       const requiredManaAmountToBurn = weiToDecimal(
-        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_BALANCE)
       )
       const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
@@ -895,7 +895,7 @@ contract('LANDAuction', function([
       )
       // Keep 5% percentage of the token
       const requiredTokenBalance = amountOfTokenConverted.mul(
-        PERCENTAGE_OF_TOKEN_TO_KEEP
+        PERCENTAGE_OF_TOKEN_BALANCE
       )
 
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {
@@ -985,7 +985,7 @@ contract('LANDAuction', function([
       const time = getBlockchainTime(logs[0].blockNumber) - startTime
       const price = getPriceWithLinearFunction(time, false)
       const requiredManaAmountToBurn = weiToDecimal(
-        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_TO_KEEP)
+        price * xs.length * (1 - PERCENTAGE_OF_TOKEN_BALANCE)
       )
       const amountOfTokenConverted = await kyberMock.getReturn(
         manaToken.address,
@@ -994,7 +994,7 @@ contract('LANDAuction', function([
       )
       // Keep 5% percentage of the token
       const requiredTokenBalance = amountOfTokenConverted.mul(
-        PERCENTAGE_OF_TOKEN_TO_KEEP
+        PERCENTAGE_OF_TOKEN_BALANCE
       )
 
       assertEvent(normalizeEvent(logs[0]), 'BidConversion', {

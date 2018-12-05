@@ -8,7 +8,7 @@ Contracts for the LAND auction
 
 ```solidity
 contract LANDAuctionStorage {
-    uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
+    uint256 constant public PERCENTAGE_OF_TOKEN_BALANCE = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
     enum Status { created, finished }
@@ -236,7 +236,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Calculate the total price in MANA
-    * Note that PERCENTAGE_OF_TOKEN_TO_KEEP will be always less than 100
+    * Note that PERCENTAGE_OF_TOKEN_BALANCE will be always less than 100
     * @param _totalPrice - uint256 price to calculate percentage to keep
     * @return uint256 of the new total price in MANA
     */

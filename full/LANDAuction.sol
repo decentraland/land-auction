@@ -319,7 +319,7 @@ contract LANDRegistry {
 
 
 contract LANDAuctionStorage {
-    uint256 constant public PERCENTAGE_OF_TOKEN_TO_KEEP = 5;
+    uint256 constant public PERCENTAGE_OF_TOKEN_BALANCE = 5;
     uint256 constant public MAX_DECIMALS = 18;
 
     enum Status { created, finished }
@@ -470,6 +470,10 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         LANDRegistry _landRegistry,
         address _dex
     ) public {
+        require(
+            PERCENTAGE_OF_TOKEN_BALANCE == 5, 
+            "Balance of tokens required should be equal to 5%"
+        );
         // Initialize owneable
         Ownable.initialize(msg.sender);
 
@@ -498,7 +502,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Set total duration of the auction
         duration = _xPoints[_xPoints.length - 1];
-        require(duration > 24 * 60 * 60, "The duration should be greater than 1 day");
+        require(duration > 1 days, "The duration should be greater than 1 day");
 
         // Set Curve
         _setCurve(_xPoints, _yPoints);
@@ -565,12 +569,6 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         _processFunds(bidId, _fromToken);
 
         // Assign LANDs to the beneficiary user
-        for (uint i = 0; i < _xs.length; i++) {
-            require(
-                -150 <= _xs[i] && _xs[i] <= 150 && -150 <= _ys[i] && _ys[i] <= 150,
-                "The coordinates should be inside bounds -150 & 150"
-            );
-        }
         landRegistry.assignMultipleParcels(_xs, _ys, _beneficiary);
 
         emit BidSuccessful(
@@ -589,8 +587,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /** 
     * @dev Validate bid function params
-    * @param _xs - uint256[] x values for the LANDs to bid
-    * @param _ys - uint256[] y values for the LANDs to bid
+    * @param _xs - int[] x values for the LANDs to bid
+    * @param _ys - int[] y values for the LANDs to bid
     * @param _beneficiary - address beneficiary for the LANDs to bid
     * @param _fromToken - token used to bid
     */
@@ -613,6 +611,12 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         require(_xs.length <= landsLimitPerBid, "LAND limit exceeded");
         require(_xs.length == _ys.length, "X values length should be equal to Y values length");
         require(tokensAllowed[address(_fromToken)].isAllowed, "Token not allowed");
+        for (uint256 i = 0; i < _xs.length; i++) {
+            require(
+                -150 <= _xs[i] && _xs[i] <= 150 && -150 <= _ys[i] && _ys[i] <= 150,
+                "The coordinates should be inside bounds -150 & 150"
+            );
+        }
     }
 
     /**
@@ -654,7 +658,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         requiredManaAmountToBurn = _bidPriceInMana;
         Token memory fromToken = tokensAllowed[address(_fromToken)];
 
-        uint bidPriceInManaPlusSafetyMargin = _bidPriceInMana.mul(conversionFee).div(100);
+        uint256 bidPriceInManaPlusSafetyMargin = _bidPriceInMana.mul(conversionFee).div(100);
 
         // Get rate
         uint256 tokenRate = getRate(manaToken, _fromToken, bidPriceInManaPlusSafetyMargin);
@@ -755,13 +759,13 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     {
         return _totalPrice.mul(_tokenRate)
             .div(10 ** 18)
-            .mul(PERCENTAGE_OF_TOKEN_TO_KEEP)
+            .mul(PERCENTAGE_OF_TOKEN_BALANCE)
             .div(100);
     }
 
     /** 
     * @dev Calculate the total price in MANA
-    * Note that PERCENTAGE_OF_TOKEN_TO_KEEP will be always less than 100
+    * Note that PERCENTAGE_OF_TOKEN_BALANCE will be always less than 100
     * @param _totalPrice - uint256 price to calculate percentage to keep
     * @return uint256 of the new total price in MANA
     */
@@ -770,7 +774,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     ) 
     internal pure returns (uint256)
     {
-        return _totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_TO_KEEP).div(100);
+        return _totalPrice.mul(100 - PERCENTAGE_OF_TOKEN_BALANCE).div(100);
     }
 
     /**
@@ -804,8 +808,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * @return uint256 price for the given time
     */
     function _getPrice(uint256 _time) internal view returns (uint256) {
-        for (uint i = 0; i < curves.length; i++) {
-            Func memory func = curves[i];
+        for (uint256 i = 0; i < curves.length; i++) {
+            Func storage func = curves[i];
             if (_time < func.limit) {
                 return func.base.sub(func.slope.mul(_time));
             }
@@ -917,6 +921,8 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
     /**
     * @dev Allow ERC20 to to be used for bidding
+    * Note that if _shouldBurnTokens and _shouldForwardTokens are false, we 
+    * will convert the total amount of the ERC20 to MANA
     * @param _address - address of the ERC20 Token
     * @param _decimals - uint256 of the number of decimals
     * @param _shouldBurnTokens - boolean whether we should burn funds
@@ -991,7 +997,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     function _setCurve(uint256[] _xPoints, uint256[] _yPoints) internal {
         uint256 pointsLength = _xPoints.length;
         require(pointsLength == _yPoints.length, "Points should have the same length");
-        for (uint i = 0; i < pointsLength - 1; i++) {
+        for (uint256 i = 0; i < pointsLength - 1; i++) {
             uint256 x1 = _xPoints[i];
             uint256 x2 = _xPoints[i + 1];
             uint256 y1 = _yPoints[i];
@@ -1020,7 +1026,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
     * It is a linear function y = ax - b. But The slope should be negative.
     * As we want to avoid negative numbers in favor of using uints we use it as: y = b - ax
     * Based on two points (x1; x2) and (y1; y2)
-    * base = (x2 * y1) - (x1 * y2) / x2 - x1
+    * base = (x2 * y1) - (x1 * y2) / (x2 - x1)
     * slope = (y1 - y2) / (x2 - x1) to avoid negative maths
     * @param _x1 - uint256 x1 value
     * @param _x2 - uint256 x2 value
