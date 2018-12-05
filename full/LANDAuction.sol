@@ -337,7 +337,7 @@ contract ITokenConverter {
         IERC20 _destToken,
         uint256 _srcAmount,
         uint256 _destAmount
-        ) external payable returns (uint256);
+        ) external returns (uint256);
 
     /**
     * @dev Get exchange rate and slippage rate. 
@@ -1006,9 +1006,14 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         );
         require(
             !_shouldForwardTokens || 
-            (_shouldForwardTokens && _forwardTarget.isContract()),
+            (_shouldForwardTokens && _forwardTarget != address(0)),
             "The token should be transferred to a deployed contract"
         );
+        require(
+            _forwardTarget != address(this) && _forwardTarget != _address, 
+            "The forward target should be different from  this contract and the erc20 token"
+        );
+        
         require(!tokensAllowed[_address].isAllowed, "The ERC20 token is already allowed");
 
         tokensAllowed[_address] = Token({
