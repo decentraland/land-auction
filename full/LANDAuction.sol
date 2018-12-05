@@ -266,6 +266,59 @@ interface IERC20 {
   );
 }
 
+// File: contracts/libs/SafeTransfer.sol
+
+/**
+* @dev Library to perform transfer for ERC20 tokens.
+* Not all the tokens transfer method has a return value (bool) neither revert for insufficient funds or 
+* unathorized _value
+*/
+library SafeTransfer {
+    /**
+    * @dev Transfer token for a specified address
+    * @param _token erc20 The address of the ERC20 contract
+    * @param _to address The address which you want to transfer to
+    * @param _value uint256 the _value of tokens to be transferred
+    */
+    function safeTransfer(IERC20 _token, address _to, uint256 _value) internal returns (bool) {
+        uint256 prevBalance = _token.balanceOf(address(this));
+
+        require(prevBalance >= _value, "Insufficient funds");
+
+        _token.transfer(_to, _value);
+
+        require(prevBalance - _value == _token.balanceOf(address(this)), "Transfer failed");
+
+        return true;
+    }
+
+    /**
+    * @dev Transfer tokens from one address to another
+    * @param _token erc20 The address of the ERC20 contract
+    * @param _from address The address which you want to send tokens from
+    * @param _to address The address which you want to transfer to
+    * @param _value uint256 the _value of tokens to be transferred
+    */
+    function safeTransferFrom(
+        IERC20 _token,
+        address _from,
+        address _to, 
+        uint256 _value
+    ) internal returns (bool) 
+    {
+        uint256 prevBalance = _token.balanceOf(_from);
+
+        require(prevBalance >= _value, "Insufficient funds");
+        require(_token.allowance(_from, address(this)) >= _value, "Insufficient allowance");
+
+        _token.transferFrom(_from, _to, _value);
+
+        require(prevBalance - _value == _token.balanceOf(_from), "Transfer failed");
+
+        return true;
+    }
+}
+
 // File: contracts/dex/ITokenConverter.sol
 
 contract ITokenConverter {    
@@ -446,6 +499,7 @@ contract LANDAuctionStorage {
 contract LANDAuction is Ownable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
+    using SafeTransfer for ERC20;
 
     /**
     * @dev Constructor of the contract.
@@ -560,7 +614,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         } else {
             // Transfer MANA to this contract
             require(
-                _fromToken.transferFrom(msg.sender, address(this), bidPriceInMana),
+                _fromToken.safeTransferFrom(msg.sender, address(this), bidPriceInMana),
                 "Insuficient balance or unauthorized amount (transferFrom failed)"
             );
         }
@@ -690,7 +744,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Retrieve tokens from the sender to this contract
         require(
-            _fromToken.transferFrom(msg.sender, address(this), tokensToConvertPlusSafetyMargin),
+            _fromToken.safeTransferFrom(msg.sender, address(this), tokensToConvertPlusSafetyMargin),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
         
@@ -712,7 +766,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         if (change > 0) {
             // Return the change of src token
             require(
-                _fromToken.transfer(msg.sender, change),
+                _fromToken.safeTransfer(msg.sender, change),
                 "Transfering the change to sender failed"
             );
         }
@@ -849,7 +903,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Check if balance is valid
         require(balance > 0, "Balance to burn should be > 0");
         
-        _token.transfer(_address, balance);
+        _token.safeTransfer(_address, balance);
 
         emit TokenTransferred(
             _bidId, 

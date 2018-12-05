@@ -41,8 +41,8 @@ contract KyberMock is IKyberNetwork {
             _destToken, 
             _srcToken
         );
-        require(_srcToken.transferFrom(msg.sender, this, destAmount), "Could not transfer");
-        require(_destToken.transfer(_destAddress, _maxDestAmount), "Could not transfer");
+        _srcToken.transferFrom(msg.sender, this, destAmount);
+        _destToken.transfer(_destAddress, _maxDestAmount);
         return _maxDestAmount;
     }
 
@@ -70,7 +70,8 @@ contract KyberMock is IKyberNetwork {
     }
 
     function getExpectedRate(IERC20 _srcToken, IERC20 _destToken, uint256 /*_srcAmount*/) 
-        public view returns(uint256, uint256) {
+        public view returns(uint256, uint256) 
+    {
         if (_srcToken == nchToken) {
             return (rate_NCH_MANA, rate_NCH_MANA);
         } else if (_srcToken == dclToken) {
@@ -84,7 +85,8 @@ contract KyberMock is IKyberNetwork {
     }
 
     function getReturn(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 
-        public view returns (uint256) {
+    public view returns (uint256) 
+    {
         uint256 rate;
         (, rate) = getExpectedRate(_srcToken, _destToken, _srcAmount);
         return convertRate(_srcAmount, rate, _srcToken, _destToken);
