@@ -214,9 +214,8 @@ library SafeTransfer {
 contract KyberConverter is ITokenConverter {
     using SafeTransfer for IERC20;
 
-    IKyberNetwork internal  kyber;
-    uint256 private constant MAX_UINT = uint256(0) - 1;
-    address internal walletId;
+    IKyberNetwork public  kyber;
+    address public walletId;
 
     constructor (IKyberNetwork _kyber, address _walletId) public {
         kyber = _kyber;
