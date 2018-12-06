@@ -284,7 +284,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
 
         // Remove approval of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.clearApprove(address(dex)), "Error remove approval");
+        require(_fromToken.clearApprove(address(dex)), "Error clear approval");
 
         emit BidConversion(
             _bidId,
