@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 import "./ITokenConverter.sol";
 import "./IKyberNetwork.sol";
-import "../libs/SafeTransfer.sol";
+import "../libs/SafeERC20.sol";
 
 
 /**
@@ -10,7 +10,7 @@ import "../libs/SafeTransfer.sol";
 * Note that need to create it with a valid kyber address
 */
 contract KyberConverter is ITokenConverter {
-    using SafeTransfer for IERC20;
+    using SafeERC20 for IERC20;
 
     IKyberNetwork public  kyber;
     address public walletId;
@@ -39,7 +39,7 @@ contract KyberConverter is ITokenConverter {
 
         // Approve Kyber to use _srcToken on belhalf of this contract
         require(
-            _srcToken.approve(kyber, _srcAmount),
+            _srcToken.safeApprove(kyber, _srcAmount),
             "Could not approve kyber to use _srcToken on behalf of this contract"
         );
 
@@ -57,7 +57,7 @@ contract KyberConverter is ITokenConverter {
 
         // Clean kyber to use _srcTokens on belhalf of this contract
         require(
-            _srcToken.approve(kyber, 0),
+            _srcToken.clearApprove(kyber),
             "Could not clean approval of kyber to use _srcToken on behalf of this contract"
         );
 

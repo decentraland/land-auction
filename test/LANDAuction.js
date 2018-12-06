@@ -9,7 +9,10 @@ require('chai')
 
 const LANDAuction = artifacts.require('LANDAuctionTest')
 const ERC20Token = artifacts.require('ERC20Test')
-const ERC20WithoutReturningValueOnTransfer = artifacts.require('ERC20WithoutReturningValueOnTransfer')
+const ERC20WithoutReturningValueOnMethods = artifacts.require(
+  'ERC20WithoutReturningValueOnMethods'
+)
+const ERC20WithApproveCondition = artifacts.require('ERC20WithApproveCondition')
 const AssetRegistryToken = artifacts.require('AssetRegistryTest')
 const KyberConverter = artifacts.require('KyberConverter')
 const KyberMock = artifacts.require('KyberMock')
@@ -232,8 +235,8 @@ contract('LANDAuction', function([
   beforeEach(async function() {
     // Create tokens
     manaToken = await ERC20Token.new(creationParams)
-    daiToken = await ERC20Token.new(creationParams)
-    dclToken = await ERC20WithoutReturningValueOnTransfer.new(creationParams)
+    daiToken = await ERC20WithApproveCondition.new(creationParams)
+    dclToken = await ERC20WithoutReturningValueOnMethods.new(creationParams)
     landRegistry = await AssetRegistryToken.new(creationParams)
 
     // Create Fake contracts
@@ -639,6 +642,13 @@ contract('LANDAuction', function([
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
       totalLandsBidded.should.be.bignumber.equal(xs.length)
+
+      // Check allowance of MANA
+      const allowance = await manaToken.allowance(
+        landAuction.address,
+        kyberConverter.address
+      )
+      allowance.should.be.bignumber.equal(0)
     })
 
     it('should bid with other tokens', async function() {
@@ -746,6 +756,13 @@ contract('LANDAuction', function([
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
       totalLandsBidded.should.be.bignumber.equal(xs.length)
+
+      // Check allowance of DAI
+      const allowance = await daiToken.allowance(
+        landAuction.address,
+        kyberConverter.address
+      )
+      allowance.should.be.bignumber.equal(1)
     })
 
     it(`should bid with a token with ${SPECIAL_DECIMALS} decimals`, async function() {
@@ -827,6 +844,13 @@ contract('LANDAuction', function([
       // Check total LAND bidded
       const totalLandsBidded = await landAuction.totalLandsBidded()
       totalLandsBidded.should.be.bignumber.equal(xs.length)
+
+      // Check allowance of DCL
+      const allowance = await dclToken.allowance(
+        landAuction.address,
+        kyberConverter.address
+      )
+      allowance.should.be.bignumber.equal(0)
     })
 
     it('should bid and burn tokens', async function() {

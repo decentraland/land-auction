@@ -4,14 +4,14 @@ import "openzeppelin-eth/contracts/ownership/Ownable.sol";
 import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "openzeppelin-eth/contracts/utils/Address.sol";
 
-import "../libs/SafeTransfer.sol";
+import "../libs/SafeERC20.sol";
 import "./LANDAuctionStorage.sol";
 
 
 contract LANDAuction is Ownable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
-    using SafeTransfer for ERC20;
+    using SafeERC20 for ERC20;
 
     /**
     * @dev Constructor of the contract.
@@ -264,7 +264,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         uint256 finalTokensToConvert = tokensToConvertPlusSafetyMargin.sub(requiredTokenBalance);
 
         // Approve amount of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.approve(address(dex), finalTokensToConvert), "Error approve");
+        require(_fromToken.safeApprove(address(dex), finalTokensToConvert), "Error approve");
 
         // Convert _fromToken to MANA
         uint256 change = dex.convert(
@@ -284,7 +284,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
 
         // Remove approval of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.approve(address(dex), 0), "Error remove approval");
+        require(_fromToken.clearApprove(address(dex)), "Error remove approval");
 
         emit BidConversion(
             _bidId,
