@@ -259,7 +259,7 @@ contract KyberConverter is ITokenConverter {
 
         // Clean kyber to use _srcTokens on belhalf of this contract
         require(
-            _srcToken.approve(kyber, 0),
+            _srcToken.approve(kyber, 1),
             "Could not clean approval of kyber to use _srcToken on behalf of this contract"
         );
 
