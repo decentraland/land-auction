@@ -152,6 +152,59 @@ contract IKyberNetwork {
         public view returns(uint expectedRate, uint slippageRate);
 }
 
+// File: contracts/libs/SafeTransfer.sol
+
+/**
+* @dev Library to perform transfer for ERC20 tokens.
+* Not all the tokens transfer method has a return value (bool) neither revert for insufficient funds or 
+* unathorized _value
+*/
+library SafeTransfer {
+    /**
+    * @dev Transfer token for a specified address
+    * @param _token erc20 The address of the ERC20 contract
+    * @param _to address The address which you want to transfer to
+    * @param _value uint256 the _value of tokens to be transferred
+    */
+    function safeTransfer(IERC20 _token, address _to, uint256 _value) internal returns (bool) {
+        uint256 prevBalance = _token.balanceOf(address(this));
+
+        require(prevBalance >= _value, "Insufficient funds");
+
+        _token.transfer(_to, _value);
+
+        require(prevBalance - _value == _token.balanceOf(address(this)), "Transfer failed");
+
+        return true;
+    }
+
+    /**
+    * @dev Transfer tokens from one address to another
+    * @param _token erc20 The address of the ERC20 contract
+    * @param _from address The address which you want to send tokens from
+    * @param _to address The address which you want to transfer to
+    * @param _value uint256 the _value of tokens to be transferred
+    */
+    function safeTransferFrom(
+        IERC20 _token,
+        address _from,
+        address _to, 
+        uint256 _value
+    ) internal returns (bool) 
+    {
+        uint256 prevBalance = _token.balanceOf(_from);
+
+        require(prevBalance >= _value, "Insufficient funds");
+        require(_token.allowance(_from, address(this)) >= _value, "Insufficient allowance");
+
+        _token.transferFrom(_from, _to, _value);
+
+        require(prevBalance - _value == _token.balanceOf(_from), "Transfer failed");
+
+        return true;
+    }
+}
+
 // File: contracts/dex/KyberConverter.sol
 
 /**
@@ -159,6 +212,8 @@ contract IKyberNetwork {
 * Note that need to create it with a valid kyber address
 */
 contract KyberConverter is ITokenConverter {
+    using SafeTransfer for IERC20;
+
     IKyberNetwork internal  kyber;
     uint256 private constant MAX_UINT = uint256(0) - 1;
     address internal walletId;
@@ -181,7 +236,7 @@ contract KyberConverter is ITokenConverter {
 
         // Transfer tokens to be converted from msg.sender to this contract
         require(
-            _srcToken.transferFrom(msg.sender, address(this), _srcAmount),
+            _srcToken.safeTransferFrom(msg.sender, address(this), _srcAmount),
             "Could not transfer _srcToken to this contract"
         );
 
@@ -214,14 +269,14 @@ contract KyberConverter is ITokenConverter {
         // Return the change of src token
         uint256 change = _srcToken.balanceOf(address(this)) - prevSrcBalance;
         require(
-            _srcToken.transfer(msg.sender, change),
+            _srcToken.safeTransfer(msg.sender, change),
             "Could not transfer change to sender"
         );
 
 
         // Transfer amount of _destTokens to msg.sender
         require(
-            _destToken.transfer(msg.sender, amount),
+            _destToken.safeTransfer(msg.sender, amount),
             "Could not transfer amount of _destToken to msg.sender"
         );
 

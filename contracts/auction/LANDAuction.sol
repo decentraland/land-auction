@@ -4,12 +4,14 @@ import "openzeppelin-eth/contracts/ownership/Ownable.sol";
 import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "openzeppelin-eth/contracts/utils/Address.sol";
 
+import "../libs/SafeTransfer.sol";
 import "./LANDAuctionStorage.sol";
 
 
 contract LANDAuction is Ownable, LANDAuctionStorage {
     using SafeMath for uint256;
     using Address for address;
+    using SafeTransfer for ERC20;
 
     /**
     * @dev Constructor of the contract.
@@ -124,7 +126,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         } else {
             // Transfer MANA to this contract
             require(
-                _fromToken.transferFrom(msg.sender, address(this), bidPriceInMana),
+                _fromToken.safeTransferFrom(msg.sender, address(this), bidPriceInMana),
                 "Insuficient balance or unauthorized amount (transferFrom failed)"
             );
         }
@@ -254,7 +256,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
 
         // Retrieve tokens from the sender to this contract
         require(
-            _fromToken.transferFrom(msg.sender, address(this), tokensToConvertPlusSafetyMargin),
+            _fromToken.safeTransferFrom(msg.sender, address(this), tokensToConvertPlusSafetyMargin),
             "Transfering the totalPrice in token to LANDAuction contract failed"
         );
         
@@ -276,7 +278,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         if (change > 0) {
             // Return the change of src token
             require(
-                _fromToken.transfer(msg.sender, change),
+                _fromToken.safeTransfer(msg.sender, change),
                 "Transfering the change to sender failed"
             );
         }
@@ -413,7 +415,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         // Check if balance is valid
         require(balance > 0, "Balance to burn should be > 0");
         
-        _token.transfer(_address, balance);
+        _token.safeTransfer(_address, balance);
 
         emit TokenTransferred(
             _bidId, 

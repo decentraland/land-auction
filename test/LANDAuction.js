@@ -9,7 +9,7 @@ require('chai')
 
 const LANDAuction = artifacts.require('LANDAuctionTest')
 const ERC20Token = artifacts.require('ERC20Test')
-const ERC20WithoutBurn = artifacts.require('ERC20WithoutBurn')
+const ERC20WithoutReturningValueOnTransfer = artifacts.require('ERC20WithoutReturningValueOnTransfer')
 const AssetRegistryToken = artifacts.require('AssetRegistryTest')
 const KyberConverter = artifacts.require('KyberConverter')
 const KyberMock = artifacts.require('KyberMock')
@@ -229,16 +229,11 @@ contract('LANDAuction', function([
     return price
   }
 
-  async function getCurrentPrice() {
-    const price = await landAuction.getCurrentPrice()
-    return weiToDecimal(price.toNumber())
-  }
-
   beforeEach(async function() {
     // Create tokens
     manaToken = await ERC20Token.new(creationParams)
     daiToken = await ERC20Token.new(creationParams)
-    dclToken = await ERC20WithoutBurn.new(creationParams)
+    dclToken = await ERC20WithoutReturningValueOnTransfer.new(creationParams)
     landRegistry = await AssetRegistryToken.new(creationParams)
 
     // Create Fake contracts
