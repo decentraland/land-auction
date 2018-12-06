@@ -119,7 +119,7 @@ contract ITokenConverter {
         IERC20 _destToken,
         uint256 _srcAmount,
         uint256 _destAmount
-        ) external payable returns (uint256);
+        ) external returns (uint256);
 
     /**
     * @dev Get exchange rate and slippage rate. 
@@ -214,9 +214,8 @@ library SafeTransfer {
 contract KyberConverter is ITokenConverter {
     using SafeTransfer for IERC20;
 
-    IKyberNetwork internal  kyber;
-    uint256 private constant MAX_UINT = uint256(0) - 1;
-    address internal walletId;
+    IKyberNetwork public  kyber;
+    address public walletId;
 
     constructor (IKyberNetwork _kyber, address _walletId) public {
         kyber = _kyber;
@@ -247,6 +246,7 @@ contract KyberConverter is ITokenConverter {
         );
 
         // Trade _srcAmount from _srcToken to _destToken
+        // Note that minConversionRate is set to 0 cause we want the lower rate possible
         uint256 amount = kyber.trade(
             _srcToken,
             _srcAmount,
@@ -267,7 +267,7 @@ contract KyberConverter is ITokenConverter {
         require(amount == _destAmount, "Amount bought is not equal to dest amount");
 
         // Return the change of src token
-        uint256 change = _srcToken.balanceOf(address(this)) - prevSrcBalance;
+        uint256 change = _srcToken.balanceOf(address(this)).sub(prevSrcBalance);
         require(
             _srcToken.safeTransfer(msg.sender, change),
             "Could not transfer change to sender"
