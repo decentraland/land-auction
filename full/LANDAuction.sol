@@ -288,7 +288,13 @@ library SafeERC20 {
 
         require(prevBalance >= _value, "Insufficient funds");
 
-        _token.transfer(_to, _value);
+        bool success = address(_token).call(
+            abi.encodeWithSignature("transfer(address,uint256)", _to, _value)
+        );
+
+        if (!success) {
+            return false;
+        }
 
         require(prevBalance - _value == _token.balanceOf(address(this)), "Transfer failed");
 
@@ -314,7 +320,13 @@ library SafeERC20 {
         require(prevBalance >= _value, "Insufficient funds");
         require(_token.allowance(_from, address(this)) >= _value, "Insufficient allowance");
 
-        _token.transferFrom(_from, _to, _value);
+        bool success = address(_token).call(
+            abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value)
+        );
+
+        if (!success) {
+            return false;
+        }
 
         require(prevBalance - _value == _token.balanceOf(_from), "Transfer failed");
 
@@ -334,11 +346,9 @@ library SafeERC20 {
    * @param _value The amount of tokens to be spent.
    */
     function safeApprove(IERC20 _token, address _spender, uint256 _value) internal returns (bool) {
-        bool success = address(_token).call(abi.encodeWithSelector(
-            _token.approve.selector,
-            _spender,
-            _value
-        )); 
+        bool success = address(_token).call(
+            abi.encodeWithSignature("approve(address,uint256)",_spender, _value)
+        ); 
 
         if (!success) {
             return false;
@@ -819,7 +829,7 @@ contract LANDAuction is Ownable, LANDAuctionStorage {
         }
 
         // Remove approval of _fromToken owned by contract to be used by dex contract
-        require(_fromToken.clearApprove(address(dex)), "Error remove approval");
+        require(_fromToken.clearApprove(address(dex)), "Error clear approval");
 
         emit BidConversion(
             _bidId,
