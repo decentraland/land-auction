@@ -53,11 +53,11 @@ contract LANDAuctionStorage {
     uint256 public totalLandsBidded = 0;
     uint256 public startTime;
     uint256 public endTime;
+    uint256 public initialPrice;
+    uint256 public endPrice;
+    uint256 public duration;
 
     Func[] internal curves;
-    uint256 internal initialPrice;
-    uint256 internal endPrice;
-    uint256 internal duration;
 
     event AuctionCreated(
       address indexed _caller,
