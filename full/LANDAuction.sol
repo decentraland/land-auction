@@ -288,7 +288,13 @@ library SafeERC20 {
 
         require(prevBalance >= _value, "Insufficient funds");
 
-        _token.transfer(_to, _value);
+        bool success = address(_token).call(
+            abi.encodeWithSignature("transfer(address,uint256)", _to, _value)
+        );
+
+        if (!success) {
+            return false;
+        }
 
         require(prevBalance - _value == _token.balanceOf(address(this)), "Transfer failed");
 

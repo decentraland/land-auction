@@ -174,7 +174,13 @@ library SafeERC20 {
 
         require(prevBalance >= _value, "Insufficient funds");
 
-        _token.transfer(_to, _value);
+        bool success = address(_token).call(
+            abi.encodeWithSignature("transfer(address,uint256)", _to, _value)
+        );
+
+        if (!success) {
+            return false;
+        }
 
         require(prevBalance - _value == _token.balanceOf(address(this)), "Transfer failed");
 
@@ -315,10 +321,13 @@ contract KyberConverter is ITokenConverter {
 
         // Return the change of src token
         uint256 change = _srcToken.balanceOf(address(this)).sub(prevSrcBalance);
-        require(
-            _srcToken.safeTransfer(msg.sender, change),
-            "Could not transfer change to sender"
-        );
+
+        if (change > 0) {
+            require(
+                _srcToken.safeTransfer(msg.sender, change),
+                "Could not transfer change to sender"
+            );
+        }
 
 
         // Transfer amount of _destTokens to msg.sender

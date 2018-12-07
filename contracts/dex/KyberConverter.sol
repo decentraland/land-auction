@@ -66,10 +66,13 @@ contract KyberConverter is ITokenConverter {
 
         // Return the change of src token
         uint256 change = _srcToken.balanceOf(address(this)).sub(prevSrcBalance);
-        require(
-            _srcToken.safeTransfer(msg.sender, change),
-            "Could not transfer change to sender"
-        );
+
+        if (change > 0) {
+            require(
+                _srcToken.safeTransfer(msg.sender, change),
+                "Could not transfer change to sender"
+            );
+        }
 
 
         // Transfer amount of _destTokens to msg.sender
