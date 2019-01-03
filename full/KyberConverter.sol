@@ -273,6 +273,7 @@ contract KyberConverter is ITokenConverter {
 
     IKyberNetwork public  kyber;
     address public walletId;
+    address public ManaToken = 0x0F5D2fB29fb7d3CFeE444a200298f468908cC942;
 
     constructor (IKyberNetwork _kyber, address _walletId) public {
         kyber = _kyber;
@@ -346,6 +347,9 @@ contract KyberConverter is ITokenConverter {
     function getExpectedRate(IERC20 _srcToken, IERC20 _destToken, uint256 _srcAmount) 
     public view returns(uint256 expectedRate, uint256 slippageRate) 
     {
-        (expectedRate, slippageRate) = kyber.getExpectedRate(_srcToken, _destToken, _srcAmount);
+        (expectedRate, slippageRate) = kyber.getExpectedRate(_srcToken, _destToken, 1);
+        if (expectedRate == 0 && address(_srcToken) == ManaToken) {
+            (expectedRate, slippageRate) = kyber.getExpectedRate(_srcToken, _destToken, 1);
+        }
     }
 }
